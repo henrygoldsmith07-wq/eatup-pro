@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en" class="">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EatUp Pro - Disk Cleanup Tool</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        .reveal { opacity: 0; transform: translateY(30px); transition: all 0.8s ease; }
+        .reveal.active { opacity: 1; transform: translateY(0); }
+        .glass-nav { background-color: rgba(255,255,255,0.95); backdrop-filter: blur(24px); }
+        .dark .glass-nav { background-color: rgba(7,9,14,0.95); }
+        @keyframes progress { 0% { width: 0%; } 100% { width: 100%; } }
+        .animate-progress { animation: progress 2s ease-out forwards; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .spin-slow { animation: spin 1s linear infinite; }
+        .progress-bar { transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
+        .file-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .file-card:hover { transform: translateX(4px); }
+        @media (max-width: 768px) {
+            .mobile-menu { transform: translateX(100%); transition: transform 0.3s ease-out; }
+            .mobile-menu.open { transform: translateX(0); }
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Plus Jakarta Sans', 'sans-serif'] },
+                    colors: { brand: { 500: '#0071e3', 600: '#0077ed', 700: '#005bb5' } }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-[#fbfbfd] dark:bg-[#07090e] transition-colors duration-300 min-h-screen">
+
+    <!-- Navigation -->
+    <nav class="glass-nav fixed w-full z-50 border-b border-neutral-200/20 dark:border-neutral-800/20">
+        <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+            <a href="#" class="flex items-center gap-2">
+                <svg class="w-8 h-8 text-brand-500" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5zm0 9l2-1-2-1-2 1 2 1zm0-3.5L12 3l2 0.5-2 1.5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                <span class="font-bold text-xl">EatUp Pro</span>
+            </a>
+            <div class="hidden md:flex items-center gap-6">
+                <button onclick="scanDrive()" class="text-neutral-600 dark:text-neutral-400 hover:text-brand-500 font-medium">Scan Drive</button>
+                <button onclick="showSection('storage')" class="text-neutral-600 dark:text-neutral-400 hover:text-brand-500 font-medium">Storage</button>
+                <button onclick="showSection('cleanup')" class="text-neutral-600 dark:text-neutral-400 hover:text-brand-500 font-medium">Cleanup</button>
+                <button id="themeToggle" class="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800">
+                    <svg class="w-5 h-5 dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+                    <svg class="w-5 h-5 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                </button>
+            </div>
+            <button id="mobileMenuBtn" class="md:hidden p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Mobile Menu -->
+    <div id="mobileMenu" class="fixed inset-0 z-50 hidden">
+        <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" onclick="toggleMobileMenu()"></div>
+        <div class="fixed right-0 top-0 h-full w-80 glass-nav p-6">
+            <div class="flex justify-between items-center mb-8">
+                <span class="font-bold text-xl">Menu</span>
+                <button onclick="toggleMobileMenu()" class="p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <nav class="space-y-4">
+                <button onclick="scanDrive(); toggleMobileMenu()" class="block py-2 text-neutral-600 dark:text-neutral-400 hover:text-brand-500">Scan Drive</button>
+                <button onclick="showSection('storage'); toggleMobileMenu()" class="block py-2 text-neutral-600 dark:text-neutral-400 hover:text-brand-500">Storage</button>
+                <button onclick="showSection('cleanup'); toggleMobileMenu()" class="block py-2 text-neutral-600 dark:text-neutral-400 hover:text-brand-500">Cleanup</button>
+            </nav>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="pt-20 px-6 pb-12">
+        
+        <!-- Storage Overview Section -->
+        <section id="storage-section" class="max-w-7xl mx-auto reveal active">
+            <div class="mb-8">
+                <h1 class="text-3xl md:text-4xl font-bold mb-2">Storage Overview</h1>
+                <p class="text-neutral-600 dark:text-neutral-400">Analyze your disk usage and free up space</p>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                <button onclick="quickClean('temp')" class="bg-white dark:bg-neutral-800 p-6 rounded-xl border border-neutral-200 dark:border-neutral-700 hover:border-brand-500 transition-all">
+                    <div class="text-3xl mb-2">🗑️</div>
+                    <h3 class="font-bold">Clear Temp Files</h3>
+                    <p class="text-sm text-neutral-500">Remove temporary files</p>
+                </button>
+                <button onclick="quickClean('duplicates')" class="bg-white dark:bg-neutral-800 p-6 rounded-xl border border-neutral-200 dark:border-neutral-700 hover:border-brand-500 transition-all">
+                    <div class="text-3xl mb-2">🔄</div>
+                    <h3 class="font-bold">Find Duplicates</h3>
+                    <p class="text-sm text-neutral-500">Identify duplicate files</p>
+                </button>
+                <button onclick="quickClean('large')" class="bg-white dark:bg-neutral-800 p-6 rounded-xl border border-neutral-200 dark:border-neutral-700 hover:border-brand-500 transition-all">
+                    <div class="text-3xl mb-2">💾</div>
+                    <h3 class="font-bold">Large Files</h3>
+                    <p class="text-sm text-neutral-500">Find files >1GB</p>
+                </button>
+                <button onclick="quickClean('all')" class="bg-gradient-to-br from-brand-500 to-brand-700 text-white p-6 rounded-xl hover:shadow-lg transition-all">
+                    <div class="text-3xl mb-2">⚡</div>
+                    <h3 class="font-bold">Smart Cleanup</h3>
+                    <p class="text-sm opacity-90">Auto-cleanup recommended</p>
+                </button>
+            </div>
+
+            <!-- Storage Analysis Results -->
+            <div id="storageResults" class="hidden">
+                <!-- Storage Map -->
+                <div class="glass-nav rounded-2xl p-6 mb-8 shadow-xl">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-xl font-bold">C: Drive Usage</h2>
+                        <div class="text-right">
+                            <p class="text-2xl font-bold" id="totalUsed">-- GB used</p>
+                            <p class="text-sm text-neutral-500">of -- GB total</p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-8 gap-2 h-48" id="storageMap">
+                        <!-- Will be populated by JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Category Breakdown -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <div class="bg-white dark:bg-neutral-800 rounded-xl p-6">
+                        <h3 class="font-bold mb-4">Category Distribution</h3>
+                        <div id="categoryBars">
+                            <!-- Bars will be populated by JavaScript -->
+                        </div>
+                    </div>
+                    <div class="bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl p-6 text-white">
+                        <h3 class="font-bold mb-4">Free Up Space</h3>
+                        <p class="mb-4">You can free up <strong class="text-2xl">12.4 GB</strong> of space by cleaning temporary files, duplicates, and old downloads.</p>
+                        <button onclick="performCleanup()" class="bg-white text-green-600 px-6 py-3 rounded-lg font-semibold hover:bg-neutral-100 transition-colors">Start Cleanup</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Cleanup Section -->
+        <section id="cleanup-section" class="max-w-7xl mx-auto hidden reveal">
+            <div class="mb-8">
+                <h1 class="text-3xl md:text-4xl font-bold mb-2">File Cleanup</h1>
+                <p class="text-neutral-600 dark:text-neutral-400">Review and remove unwanted files safely</p>
+            </div>
+
+            <!-- Scan Progress Modal -->
+            <div id="scanModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+                <div class="bg-white dark:bg-neutral-800 rounded-2xl p-8 max-w-md w-full shadow-2xl">
+                    <div class="flex items-center gap-4 mb-6">
+                        <div class="w-12 h-12 bg-brand-500/20 rounded-full flex items-center justify-center">
+                            <svg class="w-6 h-6 text-brand-500 spin-slow" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        </div>
+                        <h3 class="font-bold text-lg" id="scanTitle">Scanning...</h3>
+                    </div>
+                    <div class="w-full bg-neutral-200 dark:bg-neutral-700 rounded-full h-3 overflow-hidden">
+                        <div id="scanProgress" class="bg-brand-500 h-full rounded-full progress-bar" style="width: 0%"></div>
+                    </div>
+                    <p id="scanStatus" class="mt-4 text-sm text-neutral-600 dark:text-neutral-400">Starting scan...</p>
+                </div>
+            </div>
+
+            <!-- Cleanup Categories -->
+            <div class="space-y-6" id="cleanupCategories">
+                <!-- Filled by JavaScript -->
+            </div>
+
+            <!-- Cleanup Preview -->
+            <div id="cleanupPreview" class="hidden mt-8 bg-white dark:bg-neutral-800 rounded-2xl p-6">
+                <h2 class="text-xl font-bold mb-4">Files Ready for Cleanup</h2>
+                <div id="filesList" class="space-y-3">
+                    <!-- Files will be listed here -->
+                </div>
+                <div class="mt-6 flex justify-between items-center pt-6 border-t border-neutral-200 dark:border-neutral-700">
+                    <div>
+                        <p class="text-sm text-neutral-500">Total space to free:</p>
+                        <p class="text-2xl font-bold text-green-500" id="totalSpace">0 bytes</p>
+                    </div>
+                    <div class="flex gap-3">
+                        <button onclick="deselectAll()" class="px-6 py-3 rounded-lg border border-neutral-300 dark:border-neutral-600 font-semibold hover:bg-neutral-100 dark:hover:bg-neutral-700">Deselect All</button>
+                        <button onclick="confirmCleanup()" class="px-6 py-3 rounded-lg bg-green-500 text-white font-semibold hover:bg-green-600">Send to Recycle Bin</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Results Section -->
+        <section id="results-section" class="max-w-7xl mx-auto hidden reveal">
+            <div class="text-center mb-8">
+                <div class="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg class="w-12 h-12 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                </div>
+                <h1 class="text-3xl md:text-4xl font-bold mb-2">Cleanup Complete!</h1>
+                <p class="text-neutral-600 dark:text-neutral-400">Successfully freed up space on your drive</p>
+            </div>
+            
+            <div class="bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl p-8 text-white mb-8">
+                <div class="text-center">
+                    <p class="text-sm opacity-90 mb-2">Space Freed</p>
+                    <p class="text-6xl font-bold mb-4">12.4 GB</p>
+                    <p class="text-lg opacity-90">Your disk has more breathing room now!</p>
+                </div>
+            </div>
+
+            <div class="text-center">
+                <button onclick="location.reload()" class="bg-brand-500 hover:bg-brand-600 text-white px-8 py-4 rounded-lg font-semibold text-lg transition-colors">
+                    Scan Again
+                </button>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Confirmation Dialog -->
+    <dialog id="confirmDialog" class="p-0 rounded-2xl backdrop:bg-black/50 backdrop:backdrop-blur-sm">
+        <div class="bg-white dark:bg-neutral-800 p-8 rounded-2xl max-w-md w-full m-4">
+            <h3 class="text-xl font-bold mb-4">Confirm Deletion</h3>
+            <p class="text-neutral-600 dark:text-neutral-400 mb-6">These files will be moved to the Recycle Bin and can be restored later. Continue?</p>
+            <div class="flex gap-3">
+                <button onclick="closeDialog()" class="flex-1 px-6 py-3 rounded-lg border border-neutral-300 dark:border-neutral-600 font-semibold hover:bg-neutral-100 dark:hover:bg-neutral-700">Cancel</button>
+                <button onclick="executeCleanup()" class="flex-1 px-6 py-3 rounded-lg bg-red-500 text-white font-semibold hover:bg-red-600">Delete</button>
+            </div>
+        </div>
+    </dialog>
+
+    <script>
+        // Theme Toggle
+        function toggleTheme() {
+            const html = document.documentElement;
+            const isDark = html.classList.toggle('dark');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+        }
+
+        // Mobile Menu
+        function toggleMobileMenu() {
+            const menu = document.getElementById('mobileMenu');
+            menu.classList.toggle('hidden');
+        }
+
+        // Show Section
+        function showSection(section) {
+            document.querySelectorAll('main > section').forEach(s => s.classList.add('hidden'));
+            if (section === 'storage') {
+                document.getElementById('storage-section').classList.remove('hidden');
+            } else if (section === 'cleanup') {
+                document.getElementById('cleanup-section').classList.remove('hidden');
+            }
+        }
+
+        // Scan Drive (Simulated)
+        function scanDrive() {
+            const modal = document.getElementById('scanModal');
+            const progressBar = document.getElementById('scanProgress');
+            const statusText = document.getElementById('scanStatus');
+            const title = document.getElementById('scanTitle');
+            
+            modal.classList.remove('hidden');
+            let progress = 0;
+            progress.style.width = '0%';
+            
+            const scanSteps = [
+                { msg: 'Analyzing file system...', delay: 500 },
+                { msg: 'Scanning large files...', delay: 800 },
+                { msg: 'Checking for duplicates...', delay: 600 },
+                { msg: 'Identifying temporary files...', delay: 400 },
+                { msg: 'Calculating statistics...', delay: 300 }
+            ];
+            
+            let currentStep = 0;
+            
+            const interval = setInterval(() => {
+                if (currentStep < scanSteps.length) {
+                    progress.style.width = ((currentStep + 1) / scanSteps.length * 100) + '%';
+                    statusText.textContent = scanSteps[currentStep].msg;
+                    currentStep++;
+                } else {
+                    clearInterval(interval);
+                    modal.classList.add('hidden');
+                    document.getElementById('storageResults').classList.remove('hidden');
+                    populateStorageData();
+                    renderCleanupCategories();
+                }
+            }, scanSteps[currentStep]?.delay || 100);
+        }
+
+        // Populate Storage Data
+        function populateStorageData() {
+            const map = document.getElementById('storageMap');
+            const categories = ['Applications', 'Videos', 'Documents', 'Images', 'Music', 'Downloads', 'System', 'Other'];
+            const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500', 'bg-red-500', 'bg-teal-500', 'bg-indigo-500', 'bg-pink-500'];
+            const sizes = [45, 24, 18, 8, 3, 1, 1, 0];
+            
+            map.innerHTML = '';
+            const totalSize = sizes.reduce((a, b) => a + b, 0);
+            
+            categories.forEach((cat, i) => {
+                const size = sizes[i];
+                const colSpan = Math.max(1, Math.floor(size / 5));
+                const rowSpan = Math.max(1, Math.floor(size / 10));
+                
+                const div = document.createElement('div');
+                div.className = `${colors[i]} rounded-lg treemap-item relative`;
+                div.style.gridColumn = `span ${colSpan}`;
+                div.style.gridRow = `span ${rowSpan}`;
+                div.innerHTML = `<div class="absolute inset-0 flex items-center justify-center text-white font-bold text-sm opacity-0 group-hover:opacity-100 transition-opacity">${cat}</div>`;
+                map.appendChild(div);
+            });
+            
+            document.getElementById('totalUsed').textContent = '197 GB used';
+        }
+
+        // Render Cleanup Categories
+        function renderCleanupCategories() {
+            const categories = [
+                { id: 'temp', name: 'Temporary Files', icon: '🗑️', count: 1247, size: '2.3 GB', selected: true },
+                { id: 'duplicates', name: 'Duplicate Files', icon: '🔄', count: 89, size: '4.8 GB', selected: true },
+                { id: 'large', name: 'Large Files (>1GB)', icon: '💾', count: 23, size: '12.1 GB', selected: false },
+                { id: 'downloads', name: 'Old Downloads', icon: '📥', count: 156, size: '1.2 GB', selected: false },
+                { id: 'cache', name: 'System Cache', icon: '💰', count: 2341, size: '890 MB', selected: false }
+            ];
+            
+            const container = document.getElementById('cleanupCategories');
+            container.innerHTML = '';
+            
+            categories.forEach(cat => {
+                const card = document.createElement('div');
+                card.className = 'bg-white dark:bg-neutral-800 rounded-xl p-6 file-card cursor-pointer border-2 border-transparent hover:border-brand-500';
+                card.onclick = () => toggleSelection(cat.id);
+                card.id = cat.id + '-card';
+                
+                const isChecked = cat.selected ? 'checked' : '';
+                
+                card.innerHTML = `
+                    <div class="flex items-start gap-4">
+                        <input type="checkbox" class="mt-1 w-5 h-5 rounded border-gray-300 text-brand-500 focus:ring-brand-500" ${isChecked} onchange="updateSelection('${cat.id}')">
+                        <div class="flex-1">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-3">
+                                    <span class="text-2xl">${cat.icon}</span>
+                                    <h3 class="font-bold text-lg">${cat.name}</h3>
+                                </div>
+                                <span class="text-sm text-neutral-500">${cat.count} files • ${cat.size}</span>
+                            </div>
+                            <p class="text-sm text-neutral-600 dark:text-neutral-400 mt-1">Safe to remove • Goes to Recycle Bin</p>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        // Update Selection
+        function updateSelection(id) {
+            const checkbox = document.querySelector(`#${id}-card input`);
+            const wasSelected = !checkbox.checked;
+            checkbox.checked = !wasSelected;
+            
+            if (!wasSelected) {
+                document.getElementById('cleanupPreview').classList.remove('hidden');
+                renderFilesList();
+            }
+        }
+
+        // Toggle Selection
+        function toggleSelection(id) {
+            const checkbox = document.querySelector(`#${id}-card input`);
+            checkbox.checked = !checkbox.checked;
+            updateSelection(id);
+        }
+
+        // Render Files List
+        function renderFilesList() {
+            const list = document.getElementById('filesList');
+            const files = [
+                { name: 'install_vista.exe', size: '2.1 GB', category: 'Downloads' },
+                { name: 'backup_2023.zip', size: '1.8 GB', category: 'Large Files' },
+                { name: 'temp_file_001.tmp', size: '150 MB', category: 'Temporary' },
+                { name: 'duplicate_photo.jpg', size: '4.2 MB', category: 'Duplicates' }
+            ];
+            
+            list.innerHTML = '';
+            files.forEach(file => {
+                const item = document.createElement('div');
+                item.className = 'flex justify-between items-center p-4 bg-neutral-50 dark:bg-neutral-900 rounded-lg';
+                item.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <svg class="w-8 h-8 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                        <div>
+                            <p class="font-semibold">${file.name}</p>
+                            <p class="text-sm text-neutral-500">${file.category}</p>
+                        </div>
+                    </div>
+                    <p class="font-bold text-brand-500">${file.size}</p>
+                `;
+                list.appendChild(item);
+            });
+            
+            document.getElementById('totalSpace').textContent = '19.1 GB';
+        }
+
+        // Execute Cleanup
+        function confirmCleanup() {
+            document.getElementById('confirmDialog').showModal();
+        }
+
+        function closeDialog() {
+            document.getElementById('confirmDialog').close();
+        }
+
+        function executeCleanup() {
+            closeDialog();
+            document.getElementById('cleanup-section').classList.add('hidden');
+            document.getElementById('results-section').classList.remove('hidden');
+        }
+
+        // Quick Clean Functions
+        function quickClean(type) {
+            showSection('cleanup');
+            const modal = document.getElementById('scanModal');
+            const title = document.getElementById('scanTitle');
+            const status = document.getElementById('scanStatus');
+            const progress = document.getElementById('scanProgress');
+            
+            modal.classList.remove('hidden');
+            progress.style.width = '0%';
+            
+            setTimeout(() => { progress.style.width = '50%'; }, 300);
+            setTimeout(() => { 
+                modal.classList.add('hidden');
+                document.getElementById('cleanupPreview').classList.remove('hidden');
+                document.getElementById('totalSpace').textContent = '12.4 GB';
+                renderFilesList();
+            }, 1000);
+        }
+
+        // Deselect All
+        function deselectAll() {
+            document.querySelectorAll('#cleanup-categories input[type="checkbox"]').forEach(cb => cb.checked = false);
+            document.getElementById('cleanupPreview').classList.add('hidden');
+        }
+
+        // Initialize
+        window.addEventListener('load', () => {
+            if (localStorage.getItem('theme') === 'dark') {
+                document.documentElement.classList.add('dark');
+            }
+            document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+        });
+    </script>
+</body>
+</html>

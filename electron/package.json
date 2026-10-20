@@ -1,0 +1,47 @@
+{
+  "name": "eatup-pro-desktop",
+  "version": "1.0.0",
+  "description": "EatUp Pro - Desktop Disk Cleanup Application",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "dev": "electron . --dev"
+  },
+  "keywords": [
+    "disk-cleanup",
+    "storage-analyzer",
+    "python",
+    "electron"
+  ],
+  "author": "EatUp Team",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^27.0.0",
+    "electron-builder": "^24.9.0"
+  },
+  "build": {
+    "appId": "com.eatup.pro.desktop",
+    "productName": "EatUp Pro",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "electron/assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "files": [
+      "**/*",
+      "!*.md",
+      "electron/**/*",
+      "requirements.txt"
+    ]
+  }
+}

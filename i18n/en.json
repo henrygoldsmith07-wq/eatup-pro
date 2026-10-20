@@ -1,0 +1,84 @@
+{
+    "app": {
+        "title": "EatUp Pro",
+        "welcome": "Welcome to EatUp Pro",
+        "scanning": "Scanning...",
+        "done": "Scan Complete",
+        "cleaning": "Cleaning up...",
+        "error": "An error occurred",
+        "success": "Success!",
+        "loading": "Loading...",
+        "offline": "You are offline"
+    },
+    "menu": {
+        "home": "Home",
+        "scan": "Scan Drive",
+        "cleanup": "Cleanup Files",
+        "schedule": "Scheduled Tasks",
+        "analytics": "Analytics",
+        "settings": "Settings",
+        "help": "Help",
+        "about": "About",
+        "exit": "Exit"
+    },
+    "actions": {
+        "start_scan": "Start Scan",
+        "stop_scan": "Stop Scan",
+        "cleanup_temp": "Clear Temp Files",
+        "find_duplicates": "Find Duplicates",
+        "large_files": "Large Files (>1GB)",
+        "smart_cleanup": "Smart Cleanup",
+        "export_report": "Export Report",
+        "save_changes": "Save Changes",
+        "cancel": "Cancel",
+        "confirm": "Confirm",
+        "delete": "Delete",
+        "restore": "Restore"
+    },
+    "messages": {
+        "ready": "Ready to scan",
+        "scan_starting": "Starting disk scan...",
+        "scan_progress": "Scanning: {progress}%",
+        "scan_complete": "Scan completed! Found {count} issues.",
+        "cleanup_completed": "{size} MB freed successfully!",
+        "no_issues_found": "No cleanup issues found",
+        "space_freed": "Space freed: {size} GB",
+        "files_deleted": "{count} files deleted",
+        "confirm_delete": "Are you sure you want to delete these files?",
+        "confirm_restore": "Restore from Recycle Bin?",
+        "permission_denied": "Permission denied",
+        "file_in_use": "File is in use",
+        "retry": "Retry",
+        "skip": "Skip"
+    },
+    "categories": {
+        "applications": "Applications",
+        "videos": "Videos & Movies",
+        "documents": "Documents",
+        "images": "Images",
+        "music": "Music",
+        "downloads": "Downloads",
+        "system": "System Files",
+        "temporary": "Temporary Files",
+        "other": "Other"
+    },
+    "status": {
+        "idle": "Idle",
+        "scanning": "Scanning",
+        "analyzing": "Analyzing",
+        "complete": "Complete",
+        "running": "Running",
+        "paused": "Paused",
+        "error": "Error",
+        "safe": "Safe",
+        "warning": "Warning",
+        "dangerous": "Dangerous"
+    },
+    "tips": {
+        "temp_info": "Temporary files can be safely deleted - estimated {size} MB available",
+        "dups_info": "Duplicate files detected - can save {size} MB by removing copies",
+        "large_info": "Large files found requiring manual review",
+        "cloud_suggest": "Consider moving large files to cloud storage",
+        "monthly_tip": "Schedule monthly scans for automatic maintenance"
+    }
+}

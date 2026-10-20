@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en" class="">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EatUp Features - Full Showcase</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        .reveal { opacity: 0; transform: translateY(30px); transition: all 0.8s ease; }
+        .reveal.active { opacity: 1; transform: translateY(0); }
+        .glass-nav { background-color: rgba(255,255,255,0.9); backdrop-filter: blur(24px); }
+        .dark .glass-nav { background-color: rgba(7,9,14,0.9); }
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+        .animate-float { animation: float 6s ease-in-out infinite; }
+        .treemap-item { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .treemap-item:hover { transform: scale(1.05); z-index: 10; box-shadow: 0 10px 40px rgba(0,0,0,0.3); }
+    </style>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Plus Jakarta Sans', 'sans-serif'] },
+                    colors: { brand: { 500: '#0071e3', 600: '#0077ed', 700: '#005bb5' } }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-[#fbfbfd] dark:bg-[#07090e] transition-colors duration-300">
+
+    <!-- Navigation -->
+    <nav class="glass-nav fixed w-full z-50 border-b border-neutral-200/20 dark:border-neutral-800/20">
+        <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+            <a href="index.html" class="flex items-center gap-2">
+                <svg class="w-8 h-8 text-brand-500" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5zm0 9l2-1-2-1-2 1 2 1zm0-3.5L12 3l2 0.5-2 1.5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                <span class="font-bold text-xl">EatUp</span>
+            </a>
+            <div class="hidden md:flex items-center gap-8">
+                <a href="#storage-map" class="text-neutral-600 dark:text-neutral-400 hover:text-brand-500">Storage Map</a>
+                <a href="#file-discovery" class="text-neutral-600 dark:text-neutral-400 hover:text-brand-500">File Discovery</a>
+                <a href="#cleanup" class="text-neutral-600 dark:text-neutral-400 hover:text-brand-500">Cleanup</a>
+                <button id="themeToggle" class="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800">
+                    <svg class="w-5 h-5 dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+                    <svg class="w-5 h-5 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Section: Storage Map -->
+    <section id="storage-map" class="pt-32 pb-20 px-6 min-h-screen flex items-center">
+        <div class="max-w-7xl mx-auto w-full reveal active">
+            <h1 class="text-4xl md:text-5xl font-bold mb-6">Interactive Storage Map</h1>
+            <p class="text-xl text-neutral-600 dark:text-neutral-400 mb-12">Visualize your entire disk usage with our beautiful treemap interface</p>
+            
+            <div class="glass-nav rounded-2xl overflow-hidden shadow-2xl animate-float p-6">
+                <div class="bg-white dark:bg-neutral-800 p-6 rounded-xl">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-xl font-bold">C: Drive Usage</h2>
+                        <div class="text-right">
+                            <p class="text-2xl font-bold">197 GB used</p>
+                            <p class="text-sm text-neutral-500">of 237 GB total</p>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-6 gap-2 h-64">
+                        <div class="treemap-item bg-blue-500 rounded-lg relative group" style="grid-row: span 3; grid-column: span 2;">
+                            <div class="absolute inset-0 flex items-center justify-center text-white font-bold text-sm opacity-0 group-hover:opacity-100 transition-opacity">Apps (89GB)</div>
+                        </div>
+                        <div class="treemap-item bg-green-500 rounded-lg" style="grid-row: span 2;">
+                            <div class="absolute inset-0 flex items-center justify-center text-white font-bold text-xs opacity-0 group-hover:opacity-100 transition-opacity">Videos (47GB)</div>
+                        </div>
+                        <div class="treemap-item bg-purple-500 rounded-lg"></div>
+                        <div class="treemap-item bg-orange-500 rounded-lg"></div>
+                        <div class="treemap-item bg-red-500 rounded-lg"></div>
+                        <div class="treemap-item bg-teal-500 rounded-lg"></div>
+                        <div class="treemap-item bg-indigo-500 rounded-lg"></div>
+                        <div class="treemap-item bg-pink-500 rounded-lg"></div>
+                        <div class="treemap-item bg-yellow-500 rounded-lg"></div>
+                        <div class="treemap-item bg-cyan-500 rounded-lg"></div>
+                        <div class="treemap-item bg-lime-500 rounded-lg"></div>
+                        <div class="treemap-item bg-amber-500 rounded-lg"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section: File Discovery -->
+    <section id="file-discovery" class="py-20 px-6 bg-neutral-50 dark:bg-neutral-900">
+        <div class="max-w-7xl mx-auto reveal">
+            <h1 class="text-4xl md:text-5xl font-bold mb-6 text-center">Smart File Discovery</h1>
+            <p class="text-xl text-neutral-600 dark:text-neutral-400 mb-12 text-center">Automatically find large files, duplicates, and cleanup candidates</p>
+            
+            <div class="grid md:grid-cols-3 gap-8">
+                <div class="bg-white dark:bg-neutral-800 rounded-2xl p-6">
+                    <div class="w-14 h-14 bg-brand-500/10 rounded-xl flex items-center justify-center mb-4">
+                        <span class="text-3xl">💾</span>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3">Large Files</h3>
+                    <ul class="space-y-2 text-neutral-600 dark:text-neutral-400">
+                        <li>• ISO images (>5GB)</li>
+                        <li>• Video files (.mkv, .mp4)</li>
+                        <li>• Disk images</li>
+                        <li>• Game installations</li>
+                    </ul>
+                </div>
+                <div class="bg-white dark:bg-neutral-800 rounded-2xl p-6">
+                    <div class="w-14 h-14 bg-green-500/10 rounded-xl flex items-center justify-center mb-4">
+                        <span class="text-3xl">🔄</span>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3">Duplicates</h3>
+                    <ul class="space-y-2 text-neutral-600 dark:text-neutral-400">
+                        <li>• Same file content</li>
+                        <li>• Different names</li>
+                        <li>• Old backups</li>
+                        <li>• Download folders</li>
+                    </ul>
+                </div>
+                <div class="bg-white dark:bg-neutral-800 rounded-2xl p-6">
+                    <div class="w-14 h-14 bg-purple-500/10 rounded-xl flex items-center justify-center mb-4">
+                        <span class="text-3xl">🗑️</span>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3">Temporary Files</h3>
+                    <ul class="space-y-2 text-neutral-600 dark:text-neutral-400">
+                        <li>• System temp files</li>
+                        <li>• Browser caches</li>
+                        <li>• Update leftovers</li>
+                        <li>• Log files</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section: Cleanup -->
+    <section id="cleanup" class="py-20 px-6">
+        <div class="max-w-4xl mx-auto reveal">
+            <h1 class="text-4xl md:text-5xl font-bold mb-6 text-center">Safe Deep Cleanup</h1>
+            <p class="text-xl text-neutral-600 dark:text-neutral-400 mb-12 text-center">Remove unwanted files safely through Recycle Bin protection</p>
+            
+            <div class="bg-gradient-to-br from-brand-500 to-brand-700 rounded-2xl p-8 text-white">
+                <div class="flex items-start gap-6">
+                    <div class="flex-shrink-0">
+                        <div class="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
+                            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="text-2xl font-bold mb-4">Safety First</h3>
+                        <p class="mb-4">Every file you delete goes to the Recycle Bin first - nothing is permanently removed until you choose to empty it.</p>
+                        <ul class="space-y-2 mb-6">
+                            <li class="flex items-start gap-2">
+                                <svg class="w-5 h-5 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg>
+                                <span>All deletions restorable for 30 days</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <svg class="w-5 h-5 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg>
+                                <span>Preview files before deletion</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <svg class="w-5 h-5 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg>
+                                <span>No permanent data loss risk</span>
+                            </li>
+                        </ul>
+                        <a href="index.html" class="inline-block bg-white text-brand-600 px-6 py-3 rounded-lg font-semibold hover:bg-neutral-100 transition-colors">Download EatUp Free</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="py-12 px-6 bg-neutral-100 dark:bg-neutral-950">
+        <div class="max-w-6xl mx-auto text-center">
+            <a href="index.html" class="text-neutral-600 dark:text-neutral-400 hover:text-brand-500 transition-colors">← Back to Home</a>
+        </div>
+    </footer>
+
+    <script>
+        // Theme Toggle
+        function toggleTheme() {
+            const html = document.documentElement;
+            const isDark = html.classList.toggle('dark');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+        }
+        
+        // Scroll Animations
+        function checkReveal() {
+            document.querySelectorAll('.reveal').forEach(el => {
+                if (el.getBoundingClientRect().top < window.innerHeight - 100) {
+                    el.classList.add('active');
+                }
+            });
+        }
+        
+        window.addEventListener('load', () => {
+            if (localStorage.getItem('theme') === 'dark') {
+                document.documentElement.classList.add('dark');
+            }
+            checkReveal();
+        });
+        
+        window.addEventListener('scroll', checkReveal);
+        document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+    </script>
+</body>
+</html>

@@ -1,0 +1,84 @@
+{
+    "app": {
+        "title": "EatUp Pro",
+        "welcome": "Bienvenido a EatUp Pro",
+        "scanning": "Analizando...",
+        "done": "Análisis Completo",
+        "cleaning": "Limpieza en progreso...",
+        "error": "Ocurrió un error",
+        "success": "¡Éxito!",
+        "loading": "Cargando...",
+        "offline": "No tienes conexión"
+    },
+    "menu": {
+        "home": "Inicio",
+        "scan": "Analizar Disco",
+        "cleanup": "Limpiar Archivos",
+        "schedule": "Tareas Programadas",
+        "analytics": "Analíticas",
+        "settings": "Configuración",
+        "help": "Ayuda",
+        "about": "Acerca de",
+        "exit": "Salir"
+    },
+    "actions": {
+        "start_scan": "Iniciar Análisis",
+        "stop_scan": "Detener Análisis",
+        "cleanup_temp": "Borrar Archivos Temporales",
+        "find_duplicates": "Encontrar Duplicados",
+        "large_files": "Archivos Grandes (>1GB)",
+        "smart_cleanup": "Limpieza Inteligente",
+        "export_report": "Exportar Reporte",
+        "save_changes": "Guardar Cambios",
+        "cancel": "Cancelar",
+        "confirm": "Confirmar",
+        "delete": "Eliminar",
+        "restore": "Restaurar"
+    },
+    "messages": {
+        "ready": "Listo para analizar",
+        "scan_starting": "Iniciando análisis del disco...",
+        "scan_progress": "Analizando: {progress}%",
+        "scan_complete": "¡Análisis completado! Encontró {count} problemas.",
+        "cleanup_completed": "¡Se liberaron {size} MB con éxito!",
+        "no_issues_found": "No se encontraron problemas de limpieza",
+        "space_freed": "Espacio liberado: {size} GB",
+        "files_deleted": "{count} archivos eliminados",
+        "confirm_delete": "¿Estás seguro de que quieres eliminar estos archivos?",
+        "confirm_restore": "¿Restaurar desde la Papelera?",
+        "permission_denied": "Permiso denegado",
+        "file_in_use": "Archivo está en uso",
+        "retry": "Reintentar",
+        "skip": "Saltar"
+    },
+    "categories": {
+        "applications": "Aplicaciones",
+        "videos": "Videos y Películas",
+        "documents": "Documentos",
+        "images": "Imágenes",
+        "music": "Música",
+        "downloads": "Descargas",
+        "system": "Archivos del Sistema",
+        "temporary": "Archivos Temporales",
+        "other": "Otros"
+    },
+    "status": {
+        "idle": "Inactivo",
+        "scanning": "Analizando",
+        "analyzing": "Analizando",
+        "complete": "Completo",
+        "running": "Ejecutándose",
+        "paused": "Pausado",
+        "error": "Error",
+        "safe": "Seguro",
+        "warning": "Advertencia",
+        "dangerous": "Peligroso"
+    },
+    "tips": {
+        "temp_info": "Los archivos temporales se pueden eliminar con seguridad - {size} MB disponibles estimados",
+        "dups_info": "Archivos duplicados detectados - puedes ahorrar {size} MB eliminando copias",
+        "large_info": "Archivos grandes encontrados requieren revisión manual",
+        "cloud_suggest": "Considera mover archivos grandes al almacenamiento en la nube",
+        "monthly_tip": "Programa análisis mensuales para mantenimiento automático"
+    }
+}
