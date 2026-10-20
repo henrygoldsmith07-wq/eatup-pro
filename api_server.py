@@ -21,6 +21,7 @@ from cleaner import EatUpCleaner
 from scheduler import SchedulerManager
 from cloud_storage import CloudStorageManager
 from data.analytics_db import AnalyticsDatabase
+from ai_suggestions import AISuggestionEngine
 
 app = Flask(__name__)
 CORS(app)  # Enable Cross-Origin Resource Sharing
@@ -30,6 +31,7 @@ cleaner = None
 scheduler = None
 cloud_manager = None
 db = None
+ai_engine = None
 
 
 def get_cleaner():
@@ -62,6 +64,14 @@ def get_db():
     if db is None:
         db = AnalyticsDatabase()
     return db
+
+
+def get_ai_engine():
+    """Lazy initialization of AI suggestion engine"""
+    global ai_engine
+    if ai_engine is None:
+        ai_engine = AISuggestionEngine()
+    return ai_engine
 
 
 # Helper decorators
@@ -203,13 +213,40 @@ def scan_results(scan_id):
 @app.route('/api/v1/cleanup/run', methods=['POST'])
 @require_auth
 def cleanup_run():
-    """Run cleanup operation"""
+    """Run cleanup operation with AI recommendations"""
     try:
         data = request.json or {}
         cleanup_type = data.get('type', 'smart')
         
         cleaner_obj = get_cleaner()
         db = get_db()
+        ai_engine = get_ai_engine()
+        
+        # If smart cleanup, analyze first with AI
+        if cleanup_type == 'smart':
+            print("🤖 Generating AI cleanup plan...")
+            
+            # Load plugins
+            cleaner_obj.load_plugins()
+            
+            # Analyze scan results with AI
+            plan = ai_engine.generate_cleanup_plan(cleaner_obj)
+            
+            print(f"AI Plan Summary: {plan['summary']}")
+            
+            # Save recommended deletions to database for tracking
+            for file_entry in plan.get('files_to_delete', [])[:50]:
+                rec_data = {
+                    'recommendation_id': str(uuid.uuid4()),
+                    'scan_id': None,
+                    'filepath': file_entry['filepath'],
+                    'size_bytes': int(file_entry['size_mb'] * 1024 * 1024),
+                    'action': 'delete',
+                    'confidence': 0.85,
+                    'reason': file_entry['reason'],
+                    'risk_level': 'safe'
+                }
+                db.save_recommendation(rec_data)
         
         space_freed = 0
         files_deleted = 0
@@ -223,7 +260,19 @@ def cleanup_run():
             min_size = data.get('min_size_gb', 1)
             space_freed = cleaner_obj.cleanup_large_files(min_size_gb=min_size)
         elif cleanup_type == 'smart':
+            # Use plugin-aware cleanup
             space_freed = cleaner_obj.smart_cleanup()
+            
+            # Run cleanup plugins
+            if cleaner_obj.plugin_manager:
+                for plugin in cleaner_obj.plugin_manager.get_loaded_plugins():
+                    try:
+                        cleaned = plugin.customize_cleanup(cleaner_obj)
+                        if cleaned:
+                            print(f"  ✅ Plugin '{plugin.name}' cleaned {len(cleaned)} additional files")
+                    except Exception as e:
+                        print(f"  ⚠️  Plugin cleanup error: {e}")
+        
         else:
             return jsonify({'error': f'Unknown cleanup type: {cleanup_type}'}), 400
         
@@ -233,7 +282,7 @@ def cleanup_run():
         cleanup_id = str(uuid.uuid4())
         db.record_cleanup({
             'cleanup_id': cleanup_id,
-            'scan_id': None,  # Would link to actual scan ID if available
+            'scan_id': None,
             'cleanup_type': cleanup_type,
             'files_deleted': files_deleted,
             'space_freed_bytes': space_freed,
@@ -248,7 +297,8 @@ def cleanup_run():
             'space_freed_bytes': space_freed,
             'files_deleted': files_deleted,
             'cleanup_id': cleanup_id,
-            'timestamp': datetime.now().isoformat()
+            'timestamp': datetime.now().isoformat(),
+            'plugins_used': len(cleaner_obj.plugin_manager.get_loaded_plugins()) if cleaner_obj.plugin_manager else 0
         })
     
     except Exception as e:
@@ -566,33 +616,141 @@ def export_report():
 
 # ==================== AI & INTELLIGENCE ====================
 
-@app.route('/api/v1/ai/analyze', methods=['POST'])
+@app.route('/api/v1/ai/cleanup-plan', methods=['POST'])
 @require_auth
-def ai_analyze():
-    """AI-powered analysis of scan results"""
+def ai_cleanup_plan():
+    """Generate AI-powered cleanup plan from scan results"""
     try:
         data = request.json or {}
+        scan_id = data.get('scan_id')
         
-        # Placeholder for AI analysis
-        analysis = {
-            'confidence_score': 0.85,
-            'risk_assessment': 'low',
-            'recommendations': [
-                {
-                    'type': 'delete_temp_files',
-                    'confidence': 0.95,
-                    'reason': 'Safe to remove temporary files'
-                },
-                {
-                    'type': 'review_duplicates',
-                    'confidence': 0.72,
-                    'reason': 'Some duplicates may be important backups'
-                }
-            ],
-            'anomalies_detected': []
+        ai_engine = get_ai_engine()
+        cleaner_obj = get_cleaner()
+        
+        # Get scan results
+        if not cleaner_obj.scan_results:
+            return jsonify({'error': 'No scan results available'}), 404
+        
+        # Generate cleanup plan
+        plan = ai_engine.generate_cleanup_plan(cleaner_obj)
+        
+        # Save recommendations to database
+        db = get_db()
+        for file_entry in plan.get('files_to_delete', [])[:50]:
+            rec_data = {
+                'recommendation_id': str(uuid.uuid4()),
+                'scan_id': scan_id,
+                'filepath': file_entry['filepath'],
+                'size_bytes': int(file_entry['size_mb'] * 1024 * 1024),
+                'action': 'delete',
+                'confidence': 0.85,  # From cleanup plan logic
+                'reason': file_entry['reason'],
+                'risk_level': 'safe'
+            }
+            db.save_recommendation(rec_data)
+        
+        return jsonify({
+            'success': True,
+            'plan': plan,
+            'total_recommendations_saved': len(plan.get('files_to_delete', [])) + len(plan.get('files_to_review', []))
+        })
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/v1/ai/file-analysis/<filepath>', methods=['GET'])
+@require_auth
+def ai_file_analysis(filepath):
+    """Analyze a specific file's deletion safety"""
+    try:
+        filepath = os.path.expanduser(filepath)
+        
+        if not os.path.exists(filepath):
+            return jsonify({'error': 'File not found'}), 404
+        
+        ai_engine = get_ai_engine()
+        
+        # Get file stats
+        stat_info = os.stat(filepath)
+        file_info = {
+            'path': filepath,
+            'size': stat_info.st_size
         }
         
-        return jsonify(analysis)
+        analysis = ai_engine.analyze_file_for_safety(filepath, file_info)
+        
+        return jsonify({
+            'success': True,
+            'analysis': analysis
+        })
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/v1/ai/preferences', methods=['GET', 'POST'])
+@require_auth
+def ai_preferences():
+    """Get or set AI preferences"""
+    try:
+        db = get_db()
+        
+        if request.method == 'POST':
+            preferences = request.json or {}
+            
+            # Set user preferences
+            db.save_preference('ai_strict_mode', preferences.get('strict_mode', False))
+            db.save_preference('ai_aggressive_mode', preferences.get('aggressive_mode', False))
+            
+            # Adjust AI engine weights
+            ai_engine = get_ai_engine()
+            ai_engine.adjust_weights(preferences)
+            
+            return jsonify({
+                'success': True,
+                'message': 'AI preferences updated'
+            })
+        
+        else:
+            # Get current preferences
+            strict_mode = db.get_preference('ai_strict_mode', False)
+            aggressive_mode = db.get_preference('ai_aggressive_mode', False)
+            
+            return jsonify({
+                'success': True,
+                'preferences': {
+                    'strict_mode': strict_mode,
+                    'aggressive_mode': aggressive_mode
+                }
+            })
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/v1/ai/learn', methods=['POST'])
+@require_auth
+def ai_learn():
+    """Provide feedback on AI recommendation (user decision)"""
+    try:
+        data = request.json or {}
+        filepath = data.get('filepath')
+        decision = data.get('decision')  # delete, keep, review
+        success = data.get('success', True)
+        
+        if not filepath or not decision:
+            return jsonify({'error': 'filepath and decision required'}), 400
+        
+        ai_engine = get_ai_engine()
+        
+        # Learn from decision
+        ai_engine.learn_from_decision(filepath, decision, success)
+        
+        return jsonify({
+            'success': True,
+            'message': f'Thank you! Your feedback helps improve recommendations.'
+        })
     
     except Exception as e:
         return jsonify({'error': str(e)}), 500

@@ -17,6 +17,13 @@ from dataclasses import dataclass, asdict
 import winshell  # Windows Recycle Bin integration
 import psutil  # System monitoring
 
+# Plugin imports
+try:
+    from plugins.plugin_manager import PluginManager
+    PLUGINS_ENABLED = True
+except ImportError:
+    PLUGINS_ENABLED = False
+
 
 @dataclass
 class FileInfo:
@@ -47,11 +54,42 @@ class EatUpCleaner:
     def __init__(self):
         self.scan_results: ScanResult = None
         self.files_to_cleanup: List[FileInfo] = []
+        self.plugin_manager = PluginManager() if PLUGINS_ENABLED else None
         
-    def scan_drive(self, drive: str = "C:") -> ScanResult:
+        # Store custom paths from plugins
+        self.custom_paths = []
+        
+    def load_plugins(self):
+        """Load all available plugins"""
+        if PLUGINS_ENABLED:
+            self.plugin_manager.load_plugins_from_directory('plugins')
+            print(f"✅ Loaded {len(self.plugin_manager.get_loaded_plugins())} plugins")
+        
+    def _scan_with_plugins(self, drive: str):
+        """Run plugins during scan"""
+        if not self.plugin_manager or not PLUGINS_ENABLED:
+            return
+        
+        print("🔌 Running plugins...")
+        
+        # Call customize_scan on all loaded plugins
+        for plugin in self.plugin_manager.get_loaded_plugins():
+            try:
+                detected_paths = plugin.customize_scan(self)
+                if detected_paths:
+                    print(f"  ✅ {plugin.name}: Found {len(detected_paths)} custom paths")
+            except Exception as e:
+                print(f"  ⚠️  {plugin.name} error: {e}")
+    
+    def scan_drive(self, drive: str = "C:", use_plugins: bool = True) -> ScanResult:
         """Scan specified drive for storage analysis"""
         print(f"🔍 Scanning {drive} drive...")
         
+        # Load and run plugins first
+        if use_plugins and self.plugin_manager:
+            self._scan_with_plugins(drive)
+        
+        # Continue with main scan logic
         drive_path = Path(drive)
         total_space = drive_path.total_space
         free_space = drive_path.free_space

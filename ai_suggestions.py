@@ -9,9 +9,9 @@ import json
 import hashlib
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import List, Dict, Any, Tuple
-from dataclasses import dataclass
-import random
+from typing import List, Dict, Any, Tuple, Optional
+from dataclasses import dataclass, asdict, field
+from collections import defaultdict
 
 
 @dataclass
@@ -33,9 +33,12 @@ class Recommendation:
     priority: str  # high, medium, low
     action: str  # delete, keep, review, archive
     reason: str
-    files_involved: List[str]
-    potential_savings_mb: float
+    files_involved: List[str] = field(default_factory=list)
+    potential_savings_mb: float = 0.0
     risk_level: str  # safe, moderate, risky
+    
+    def to_dict(self):
+        return asdict(self)
 
 
 class AISuggestionEngine:
@@ -46,53 +49,90 @@ class AISuggestionEngine:
         self.deletion_history = []
         self.model_weights = self._initialize_weights()
         self.learning_rate = 0.1
+        self.file_cache = {}  # Cache file stats to avoid re-reading
         
     def _initialize_weights(self) -> Dict[str, float]:
-        """Initialize ML model weights (simplified version)"""
+        """Initialize ML model weights"""
         return {
             'age_weight': 0.25,
-            'size_weight': 0.15,
+            'size_weight': 0.10,
             'frequency_weight': 0.20,
             'category_weight': 0.25,
-            'temp_penalty': 0.75,
-            'extension_safety': 0.50
+            'temp_penalty': 0.80,
+            'extension_safety': 0.40
         }
     
-    def analyze_file_for_safety(self, filepath: str, stats: Dict[str, Any]) -> Dict[str, Any]:
+    def analyze_file_for_safety(self, filepath: str, file_info=None) -> Dict[str, Any]:
         """Analyze single file for deletion safety"""
-        
-        # Extract features
-        features = self._extract_features(filepath, stats)
-        
-        # Calculate safety score
-        safety_score = self._calculate_safety_score(features)
-        
-        # Determine recommendation
-        recommendation = self._generate_recommendation(safety_score, features)
-        
-        return {
-            'filepath': filepath,
-            'size_mb': stats.get('size', 0) / (1024 * 1024),
-            'age_days': self._get_file_age(days=True),
-            'features': {
-                'age_days': features.age_age_days,
-                'ext_entropy': features.ext_entropy,
-                'path_depth': features.path_depth
-            },
-            'safety_score': safety_score,
-            'recommendation': recommendation
-        }
+        try:
+            if file_info is None:
+                # Get file info from cleaner.py FileInfo object
+                if hasattr(file_info, 'path'):
+                    filepath = file_info.path
+                else:
+                    stat_info = os.stat(filepath)
+                    size = stat_info.st_size
+                stat_info = os.stat(filepath)
+                size = stat_info.st_size
+                mtime = datetime.fromtimestamp(stat_info.st_mtime)
+                atime = datetime.fromtimestamp(stat_info.st_atime)
+                age_days = (datetime.now() - mtime).days
+                days_since_access = (datetime.now() - atime).days
+            else:
+                # Use provided FileInfo
+                size = file_info.size
+                mtime = datetime.fromtimestamp(datetime.now().timestamp())  # Approximation
+                age_days = file_info.age_days if hasattr(file_info, 'age_days') else 0
+            
+            stat_info = os.stat(filepath)
+            
+            # Extract features
+            features = self._extract_features(filepath, size)
+            
+            # Calculate safety score
+            safety_score = self._calculate_safety_score(features)
+            
+            # Determine recommendation
+            recommendation = self._generate_recommendation(safety_score, features, filepath)
+            
+            return {
+                'filepath': filepath,
+                'size_mb': size / (1024 * 1024),
+                'age_days': age_days,
+                'features': {
+                    'file_age_days': features.file_age_days,
+                    'ext_entropy': features.ext_entropy,
+                    'path_depth': features.path_depth,
+                    'access_frequency': features.access_frequency,
+                    'is_temp_like': features.is_temp_like,
+                    'category_risk': features.category_risk
+                },
+                'safety_score': round(safety_score, 3),
+                'recommendation': recommendation.to_dict(),
+                'status': 'analyzed'
+            }
+            
+        except Exception as e:
+            return {
+                'filepath': filepath,
+                'error': str(e),
+                'status': 'error'
+            }
     
-    def _extract_features(self, filepath: str, stats: Dict[str, Any]) -> AIFeature:
+    def _extract_features(self, filepath: str, size: float) -> AIFeature:
         """Extract ML features from file"""
-        from datetime import datetime
-        
         path_obj = Path(filepath)
         
         # File age
-        stat_info = os.stat(filepath)
-        mtime = datetime.fromtimestamp(stat_info.st_mtime)
-        age_days = (datetime.now() - mtime).days
+        try:
+            stat_info = os.stat(filepath)
+            mtime = datetime.fromtimestamp(stat_info.st_mtime)
+            age_days = max(0, (datetime.now() - mtime).days)
+            atime = datetime.fromtimestamp(stat_info.st_atime)
+            days_since_access = max(0, (datetime.now() - atime).days)
+        except OSError:
+            age_days = 30  # Default assumption
+            days_since_access = 90
         
         # Extension entropy (higher = more complex/rare)
         ext = path_obj.suffix.lower()
@@ -102,19 +142,17 @@ class AISuggestionEngine:
         depth = len(path_obj.parts)
         
         # Access frequency (simplified)
-        atime = datetime.fromtimestamp(stat_info.st_atime)
-        days_since_access = (datetime.now() - atime).days
         access_freq = max(0, 1 - (days_since_access / 90))  # Less frequent if not accessed in 90 days
         
         # Is temp-like
-        is_temp = any(pattern in filepath.lower() for pattern in ['.tmp', '.cache', '~$'])
+        is_temp = any(pattern in filepath.lower() for pattern in ['.tmp', '.cache', '~$', '.swp'])
         
         # Category risk
         category_risk = self._calculate_category_risk(path_obj, ext)
         
         return AIFeature(
             file_age_days=age_days,
-            file_size_mb=stats.get('size', 0) / (1024 * 1024),
+            file_size_mb=size / (1024 * 1024),
             ext_entropy=entropy,
             path_depth=depth,
             access_frequency=access_freq,
@@ -133,33 +171,34 @@ class AISuggestionEngine:
         scores.append(age_score * weights['age_weight'])
         
         # Frequency component: rarely accessed files are safer
-        freq_score = features.access_frequency
-        scores.append((1 - freq_score) * weights['frequency_weight'])
+        freq_score = (1 - features.access_frequency)  # Lower access = safer
+        scores.append(freq_score * weights['frequency_weight'])
         
-        # Category risk: already calculated risk
+        # Category risk: already calculated risk (inverse for safety)
         scores.append((1 - features.category_risk) * weights['category_weight'])
         
         # Temp penalty: temp-like files get boost
         if features.is_temp_like:
             scores.append(weights['temp_penalty'])
         
-        # Extension safety
-        ext_safety = features.ext_entropy * weights['extension_safety']
-        scores.append(ext_safety)
+        # Size factor: very large files should be reviewed
+        size_factor = 1.0 if features.file_size_mb < 100 else 0.7  # Large files slightly less safe
+        scores.append(size_factor * weights['size_weight'])
         
+        # Average all scores
         return sum(scores) / len(scores)
     
     def _calculate_category_risk(self, path_obj: Path, ext: str) -> float:
         """Calculate risk score based on file category (0=low risk, 1=high risk)"""
-        # Low risk categories (safe to delete)
-        low_risk_extensions = {'.tmp', '.cache', '.log', '.bak', '.swp'}
+        # Low risk extensions (safe to delete)
+        low_risk_extensions = {'.tmp', '.cache', '.log', '.bak', '.swp', '.old', '.temp'}
         
-        # Medium risk
-        medium_risk_paths = ['temp', 'cache', 'downloads']
+        # Medium risk paths
+        medium_risk_paths = ['temp', 'cache', 'downloads', 'tmp']
         
-        # High risk
-        high_risk_paths = ['windows', 'program files', 'appdata']
-        protected_extensions = {'.exe', '.dll', '.sys', '.msi'}
+        # High risk paths
+        high_risk_paths = ['windows', 'program files', 'appdata', 'system32', 'programdata']
+        protected_extensions = {'.exe', '.dll', '.sys', '.msi', '.drv', '.bin'}
         
         path_str = str(path_obj).lower()
         
@@ -179,7 +218,7 @@ class AISuggestionEngine:
         
         return 0.6  # Default risk
     
-    def _generate_recommendation(self, safety_score: float, features: AIFeature) -> Recommendation:
+    def _generate_recommendation(self, safety_score: float, features: AIFeature, filepath: str) -> Recommendation:
         """Generate recommendation based on safety score"""
         
         if safety_score > 0.8:
@@ -187,8 +226,8 @@ class AISuggestionEngine:
                 confidence=min(1.0, safety_score),
                 priority='high',
                 action='delete',
-                reason='High safety score: Old, rarely accessed, low-risk category',
-                files_involved=[],
+                reason=f'High safety score ({safety_score:.2f}): Old, rarely accessed file in safe category',
+                files_involved=[filepath],
                 potential_savings_mb=features.file_size_mb,
                 risk_level='safe'
             )
@@ -197,7 +236,140 @@ class AISuggestionEngine:
                 confidence=safety_score,
                 priority='medium',
                 action='review',
-                reason='Moderate safety: Review before deleting',
+                reason=f'Moderate safety ({safety_score:.2f}): Review manually before deletion',
+                files_involved=[filepath],
+                potential_savings_mb=features.file_size_mb,
+                risk_level='moderate'
+            )
+        else:
+            return Recommendation(
+                confidence=safety_score,
+                priority='low',
+                action='keep',
+                reason=f'Low safety score ({safety_score:.2f}): Potentially important file - keep',
+                files_involved=[filepath],
+                potential_savings_mb=0.0,
+                risk_level='risky'
+            )
+    
+    def scan_and_analyze_files(self, files: List[Any]) -> List[Dict[str, Any]]:
+        """Analyze multiple files and batch process recommendations"""
+        recommendations = []
+        
+        for file_info in files:
+            filepath = file_info.path if hasattr(file_info, 'path') else file_info
+            size = file_info.size if hasattr(file_info, 'size') else os.path.getsize(filepath)
+            
+            analysis = self.analyze_file_for_safety(filepath, file_info)
+            recommendations.append(analysis)
+        
+        return recommendations
+    
+    def generate_cleanup_plan(self, scan_results) -> Dict[str, Any]:
+        """Generate a comprehensive cleanup plan based on scan results"""
+        
+        plan = {
+            'timestamp': datetime.now().isoformat(),
+            'total_potential_savings_mb': 0,
+            'confidence_average': 0,
+            'recommended_actions': [],
+            'files_to_delete': [],
+            'files_to_review': [],
+            'files_to_keep': [],
+            'summary': ''
+        }
+        
+        if not scan_results or not hasattr(scan_results, 'scan_results'):
+            return plan
+        
+        results = scan_results.scan_results
+        
+        # Analyze temporary files
+        if results.temp_files:
+            temp_analysis = self.scan_and_analyze_files(results.temp_files[:100])  # Limit for performance
+            for analysis in temp_analysis:
+                if analysis['status'] == 'analyzed':
+                    rec = analysis['recommendation']
+                    if rec['action'] == 'delete':
+                        plan['files_to_delete'].append({
+                            'filepath': analysis['filepath'],
+                            'size_mb': analysis['size_mb'],
+                            'safety_score': analysis['safety_score'],
+                            'reason': rec['reason']
+                        })
+                    elif rec['action'] == 'review':
+                        plan['files_to_review'].append({
+                            'filepath': analysis['filepath'],
+                            'size_mb': analysis['size_mb'],
+                            'safety_score': analysis['safety_score']
+                        })
+                    
+                    plan['total_potential_savings_mb'] += analysis['size_mb'] if rec['action'] == 'delete' else 0
+                    plan['confidence_average'] += rec['confidence']
+        
+        # Analyze duplicates
+        if results.duplicates:
+            for dup_group in results.duplicates[:20]:  # Limit groups
+                if len(dup_group) > 1:
+                    keep_file = dup_group[0]
+                    delete_files = dup_group[1:]
+                    
+                    total_size = sum(f.size for f in delete_files)
+                    plan['files_to_delete'].extend([
+                        {
+                            'filepath': f.path,
+                            'size_mb': f.size / (1024 * 1024),
+                            'safety_score': 0.85,
+                            'reason': 'Duplicate file - keep one copy only'
+                        }
+                        for f in delete_files
+                    ])
+                    
+                    plan['total_potential_savings_mb'] += total_size / (1024 * 1024)
+        
+        # Generate summary
+        if plan['files_to_delete']:
+            plan['confidence_average'] /= len(plan['files_to_delete']) if plan['files_to_delete'] else 0
+            plan['summary'] = (
+                f"Recommended cleanup of {len(plan['files_to_delete'])} files\n"
+                f"Potential savings: {plan['total_potential_savings_mb']:.1f} MB\n"
+                f"Average confidence: {plan['confidence_average']:.1%}"
+            )
+        else:
+            plan['summary'] = "No safe files found for automatic deletion. Review recommended files."
+        
+        return plan
+    
+    def learn_from_decision(self, filepath: str, decision: str, success: bool):
+        """Learn from user's decisions to improve future recommendations"""
+        if success:
+            self.deletion_history.append({
+                'filepath': filepath,
+                'decision': decision,
+                'timestamp': datetime.now().isoformat(),
+                'outcome': 'success'
+            })
+            
+            # Adjust weights based on positive feedback
+            if decision == 'delete':
+                # Increase temp penalty weight (user agrees temp files are safe)
+                self.model_weights['temp_penalty'] = min(1.0, self.model_weights['temp_penalty'] + 0.02)
+            elif decision == 'keep':
+                # Decrease category weight (user values certain categories)
+                self.model_weights['category_weight'] = max(0.1, self.model_weights['category_weight'] - 0.01)
+    
+    def adjust_weights(self, preferences: Dict[str, Any]):
+        """Adjust AI weights based on user preferences"""
+        if 'strict_mode' in preferences and preferences['strict_mode']:
+            # Stricter mode - fewer deletions
+            self.model_weights['category_weight'] *= 1.2
+            self.model_weights['temp_penalty'] *= 0.8
+        elif 'aggressive_mode' in preferences and preferences['aggressive_mode']:
+            # Aggressive mode - more deletions
+            self.model_weights['temp_penalty'] *= 1.3
+            self.model_weights['category_weight'] *= 0.8
+        
+        self.model_weights = {k: min(1.0, max(0.1, v)) for k, v in self.model_weights.items()}
                 files_involved=[],
                 potential_savings_mb=features.file_size_mb,
                 risk_level='moderate'
