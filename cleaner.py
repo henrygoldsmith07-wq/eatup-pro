@@ -9,9 +9,10 @@ import sys
 import json
 import shutil
 import hashlib
+import math
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Set
 from dataclasses import dataclass, asdict
 import winshell  # Windows Recycle Bin integration
 import psutil  # System monitoring
@@ -96,7 +97,7 @@ class EatUpCleaner:
                         file_size = file_stat.st_size
                         
                         # Determine category
-                        ext = pathlib.Path(filename).suffix.lower()
+                        ext = Path(filename).suffix.lower()
                         category = self._classify_file(ext, filepath, filename)
                         categories[category] += file_size
                         
@@ -201,32 +202,112 @@ class EatUpCleaner:
         temp_dirs = ['temp', 'tmp', 'cache', '$recycle.bin']
         return any(d in path_str for d in temp_dirs)
     
-    def find_duplicates(self) -> List[List[FileInfo]]:
-        """Find duplicate files based on content hash"""
+    def find_duplicates(self, chunk_size: int = 65536) -> List[List[FileInfo]]:
+        """Find duplicate files based on content hash (MD5 for speed)"""
         print("🔎 Finding duplicate files...")
         
         if not self.scan_results:
             self.scan_drive()
         
-        # Simple demo: group by size first
-        size_groups = {}
-        for category, size in self.scan_results.categories.items():
-            if size > 100_000_000:  # > 100MB threshold
-                key = size // 1_000_000  # Group by MB
-                if key not in size_groups:
-                    size_groups[key] = []
+        # Group files by size first (only files with same size can be duplicates)
+        size_groups: Dict[int, List[FileInfo]] = {}
         
-        # Return simplified results
+        for category, size in self.scan_results.categories.items():
+            pass  # Skip this loop, using temp_files and large_files instead
+        
+        # Process temp files and large files for duplicates
+        all_potential_files = self.scan_results.temp_files + self.scan_results.large_files
+        
+        # Also scan for duplicates in other categories
+        try:
+            drive_path = Path("C:")
+            total_space = drive_path.total_space
+            free_space = drive_path.free_space
+            
+            for root, dirs, files in os.walk("C:", topdown=True):
+                if root.count(os.sep) - 1 > 4:  # Limit depth
+                    dirs.clear()
+                    continue
+                
+                for filename in files:
+                    try:
+                        filepath = Path(root) / filename
+                        file_stat = filepath.stat()
+                        file_size = file_stat.st_size
+                        
+                        # Only check files > 1MB to avoid scanning too many small files
+                        if file_size < 1_000_000:
+                            continue
+                        
+                        ext = Path(filename).suffix.lower()
+                        category = self._classify_file(ext, filepath, filename)
+                        
+                        # Skip system/critical directories
+                        path_str = str(filepath).lower()
+                        if any(p in path_str for p in ['windows', 'program files', 'system32']):
+                            continue
+                        
+                        if file_size not in size_groups:
+                            size_groups[file_size] = []
+                        
+                        size_groups[file_size].append(FileInfo(
+                            path=str(filepath),
+                            size=file_size,
+                            name=filename,
+                            category=category,
+                            age_days=int((datetime.now().timestamp() - file_stat.st_mtime) / 86400)
+                        ))
+                    except (OSError, PermissionError):
+                        pass
+        except Exception as e:
+            print(f"⚠️  Limited duplicate scanning due to: {e}")
+        
+        # Now compute hashes only for files that share sizes
         duplicates = []
-        if len(size_groups) > 1:
-            sample_files = [
-                FileInfo(path="/sample/1.mp4", size=500000000, name="video1.mp4", category="Videos"),
-                FileInfo(path="/sample/2.mp4", size=500000000, name="video2.mp4", category="Videos")
-            ]
-            duplicates.append(sample_files)
+        files_processed = 0
+        hash_computed = 0
+        
+        for size, files in size_groups.items():
+            if len(files) < 2:
+                continue
+            
+            # Group by hash
+            hash_groups: Dict[str, List[FileInfo]] = {}
+            
+            for file_info in files:
+                try:
+                    hash_value = self._compute_file_hash(file_info.path, chunk_size)
+                    hash_computed += 1
+                    
+                    if hash_value not in hash_groups:
+                        hash_groups[hash_value] = []
+                    hash_groups[hash_value].append(file_info)
+                    
+                except (OSError, PermissionError):
+                    files_processed += 1
+                    continue
+            
+            # Add groups with duplicates
+            for hash_value, dup_files in hash_groups.items():
+                if len(dup_files) >= 2:
+                    duplicates.append(dup_files)
+                    files_processed += len(dup_files)
         
         self.scan_results.duplicates = duplicates
+        
+        print(f"✅ Found {len(duplicates)} duplicate groups from {files_processed} files ({hash_computed} hashes computed)")
         return duplicates
+    
+    def _compute_file_hash(self, filepath: str, chunk_size: int = 65536) -> str:
+        """Compute MD5 hash of a file (fast for duplicate detection)"""
+        hash_md5 = hashlib.md5()
+        try:
+            with open(filepath, "rb") as f:
+                for chunk in iter(lambda: f.read(chunk_size), b""):
+                    hash_md5.update(chunk)
+            return hash_md5.hexdigest()
+        except (OSError, PermissionError):
+            return ""
     
     def get_temp_files_list(self, limit: int = 100) -> List[FileInfo]:
         """Get list of temporary files"""

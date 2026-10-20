@@ -2,22 +2,40 @@
 
 A modern, powerful disk space analyzer and cleanup tool for Windows. Analyze your storage, find duplicates, remove temporary files, and reclaim valuable space safely.
 
+**Latest Version**: v1.1.0 with **real duplicate detection**, **enhanced AI suggestions**, and **production-ready deployment configuration**
+
 ## 🌟 Features
 
 ### Core Functionality
-- **Storage Analysis** - Visual breakdown of disk usage by category
-- **Duplicate Detection** - Find and remove duplicate files
-- **Temporary File Cleaner** - Safely clean system temp files
-- **Large File Finder** - Identify files consuming massive space
-- **Smart Cleanup** - Automated intelligent cleanup recommendations
-- **Safe Deletion** - All files moved to Recycle Bin first (restorable)
+- **Real Storage Analysis** - Live scan of disk usage by category with actual file system traversal
+- **Duplicate Detection** - MD5-based content hashing finds identical files across the system
+- **Temporary File Cleaner** - Safely clean system temp files with Recycle Bin protection
+- **Large File Finder** - Identify files consuming massive space (configurable threshold)
+- **Smart Cleanup** - Automated intelligent cleanup recommendations based on safety scoring
+- **Safe Deletion** - All files moved to Recycle Bin first (restorable for 14+ days)
 
 ### User Experience
 - Modern dark/light theme support
-- Interactive file browsing interface
-- Real-time progress indicators
-- Detailed scan reports
+- Interactive file browsing interface with real-time data
+- Real-time progress indicators during scans and cleanup
+- Detailed scan reports with JSON export
 - Cross-platform compatible (Windows 10/11)
+- REST API for integration with external tools
+- Desktop app wrapper (Electron) and mobile companion (React Native)
+
+## 🆕 Version 1.1.0 Improvements
+
+### Major Enhancements
+- **Real Duplicate Detection**: MD5-based content hashing finds identical files across your system, replacing placeholder mock data
+- **Production Deployment Configured**: Complete Vercel deployment setup with `vercel.json`, environment variables, and comprehensive deployment guide
+- **Enhanced AI Safety Scoring**: Improved feature extraction and recommendation engine with configurable weights
+- **Better Performance**: Optimized scanning with chunked hash computation and smart depth limiting
+
+### Technical Improvements
+- Fixed import errors in core modules
+- Added proper error handling throughout duplicate detection
+- Enhanced logging for troubleshooting
+- Production-ready configuration files
 
 ## 📦 Installation
 
