@@ -13,12 +13,14 @@ from flask import Flask, request, jsonify, send_file, Response
 from flask_cors import CORS
 from functools import wraps
 import threading
+import uuid
 
 # Import local modules
 sys.path.append(os.path.dirname(__file__))
 from cleaner import EatUpCleaner
 from scheduler import SchedulerManager
 from cloud_storage import CloudStorageManager
+from data.analytics_db import AnalyticsDatabase
 
 app = Flask(__name__)
 CORS(app)  # Enable Cross-Origin Resource Sharing
@@ -27,6 +29,7 @@ CORS(app)  # Enable Cross-Origin Resource Sharing
 cleaner = None
 scheduler = None
 cloud_manager = None
+db = None
 
 
 def get_cleaner():
@@ -51,6 +54,14 @@ def get_cloud_manager():
     if cloud_manager is None:
         cloud_manager = CloudStorageManager()
     return cloud_manager
+
+
+def get_db():
+    """Lazy initialization of analytics database"""
+    global db
+    if db is None:
+        db = AnalyticsDatabase()
+    return db
 
 
 # Helper decorators
@@ -117,13 +128,48 @@ def scan_start():
 @app.route('/api/v1/scan/status/<scan_id>', methods=['GET'])
 def scan_status(scan_id):
     """Get scan status"""
-    # Simplified - in production, store scan results
-    return jsonify({
-        'scan_id': scan_id,
-        'status': 'complete',
-        'progress': 100,
-        'message': 'Scan completed'
-    })
+    try:
+        # Check if scan is complete
+        cleaner_obj = get_cleaner()
+        
+        if cleaner_obj.scan_results and not hasattr(cleaner_obj, '_scan_in_progress'):
+            # Scan completed, save to database
+            db = get_db()
+            
+            categories_json = json.dumps(cleaner_obj.scan_results.categories)
+            
+            scan_data = {
+                'scan_id': scan_id,
+                'drive': 'C:',
+                'total_used_bytes': cleaner_obj.scan_results.total_used,
+                'total_space_bytes': cleaner_obj.scan_results.total_space,
+                'utilization_percent': (cleaner_obj.scan_results.total_used / cleaner_obj.scan_results.total_space * 100) if cleaner_obj.scan_results.total_space > 0 else 0,
+                'categories_json': categories_json,
+                'temp_files_count': len(cleaner_obj.scan_results.temp_files),
+                'duplicate_groups_count': len(cleaner_obj.scan_results.duplicates),
+                'large_files_count': len(cleaner_obj.scan_results.large_files),
+                'cleanable_bytes': cleaner_obj.scan_results.cleanable_size,
+                'status': 'complete'
+            }
+            
+            db.save_scan(scan_data)
+            
+            return jsonify({
+                'scan_id': scan_id,
+                'status': 'complete',
+                'progress': 100,
+                'message': 'Scan completed successfully'
+            })
+        
+        return jsonify({
+            'scan_id': scan_id,
+            'status': 'running',
+            'progress': 50,
+            'message': 'Scanning in progress...'
+        })
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/v1/scan/results/<scan_id>', methods=['GET'])
@@ -163,11 +209,14 @@ def cleanup_run():
         cleanup_type = data.get('type', 'smart')
         
         cleaner_obj = get_cleaner()
+        db = get_db()
         
         space_freed = 0
+        files_deleted = 0
         
         if cleanup_type == 'temp':
             space_freed = cleaner_obj.cleanup_temp_files(dry_run=False)
+            files_deleted = len(cleaner_obj.get_temp_files_list())
         elif cleanup_type == 'duplicates':
             space_freed = cleaner_obj.cleanup_duplicates(dry_run=False)
         elif cleanup_type == 'large':
@@ -180,10 +229,25 @@ def cleanup_run():
         
         freed_mb = space_freed / (1024**2)
         
+        # Record in database
+        cleanup_id = str(uuid.uuid4())
+        db.record_cleanup({
+            'cleanup_id': cleanup_id,
+            'scan_id': None,  # Would link to actual scan ID if available
+            'cleanup_type': cleanup_type,
+            'files_deleted': files_deleted,
+            'space_freed_bytes': space_freed,
+            'duration_seconds': None,
+            'success': True
+        })
+        
         return jsonify({
             'status': 'success',
             'cleanup_type': cleanup_type,
             'space_freed_mb': freed_mb,
+            'space_freed_bytes': space_freed,
+            'files_deleted': files_deleted,
+            'cleanup_id': cleanup_id,
             'timestamp': datetime.now().isoformat()
         })
     
@@ -382,17 +446,96 @@ def cloud_stats():
 def analytics_trends():
     """Get historical usage trends"""
     try:
+        db = get_db()
         days = request.args.get('days', 90, type=int)
         
-        # Placeholder - implement full analytics engine
-        trends = {
-            'days_analyzed': days,
-            'data_points': [],
-            'trend_direction': 'stable',
-            'average_daily_growth_mb': 10.5
-        }
+        # Try to get cached trends first
+        cached = db.get_cached_trends(max_age_hours=24)
+        if cached:
+            return jsonify({
+                'days_analyzed': days,
+                'daily_growth_mb': cached['daily_growth_mb'],
+                'weekly_growth_mb': cached['weekly_growth_mb'],
+                'monthly_growth_mb': cached['monthly_growth_mb'],
+                'trend_direction': 'stable',
+                'average_utilization': cached['average_utilization'],
+                'prediction_next_30_days_mb': cached['prediction_next_30_days_mb'],
+                'data_points': 0  # From cache
+            })
+        
+        # Calculate fresh trends
+        trends = db.calculate_trends(days=days)
+        
+        # Cache results
+        db.cache_trends(trends)
         
         return jsonify(trends)
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/v1/analytics/scans', methods=['GET'])
+def analytics_scans():
+    """Get list of recent scans"""
+    try:
+        db = get_db()
+        limit = request.args.get('limit', 10, type=int)
+        
+        scans = db.get_recent_scans(limit=limit)
+        
+        return jsonify({
+            'count': len(scans),
+            'scans': [{
+                'id': s['id'],
+                'timestamp': s['timestamp'],
+                'drive': s['drive'],
+                'total_used_gb': s['total_used_bytes'] / (1024**3),
+                'utilization_percent': s['utilization_percent'],
+                'status': s['status']
+            } for s in scans]
+        })
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/v1/analytics/cleanup-history', methods=['GET'])
+def analytics_cleanup_history():
+    """Get history of cleanup operations"""
+    try:
+        db = get_db()
+        limit = request.args.get('limit', 20, type=int)
+        
+        history = db.get_cleanup_history(limit=limit)
+        
+        return jsonify({
+            'count': len(history),
+            'cleanups': [{
+                'id': h['id'],
+                'timestamp': h['timestamp'],
+                'type': h['cleanup_type'],
+                'files_deleted': h['files_deleted'],
+                'space_freed_mb': h['space_freed_bytes'] / (1024**2),
+                'success': h['success']
+            } for h in history]
+        })
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/v1/analytics/statistics', methods=['GET'])
+def analytics_statistics():
+    """Get overall app statistics"""
+    try:
+        db = get_db()
+        stats = db.get_statistics()
+        
+        # Add total space saved last 30 days
+        stats['total_space_saved_last_30_days_mb'] = db.get_total_space_saved(days=30) / (1024**2)
+        
+        return jsonify(stats)
     
     except Exception as e:
         return jsonify({'error': str(e)}), 500

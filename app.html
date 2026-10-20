@@ -231,6 +231,148 @@
     </dialog>
 
     <script>
+        // Helper: Sleep utility for async operations
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+        
+        // Display actual scan results from API
+        async function displayScanResults(results, scanId) {
+            const map = document.getElementById('storageMap');
+            const categories = ['Applications', 'Videos', 'Documents', 'Images', 'Music', 'Downloads', 'System', 'Other'];
+            const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500', 'bg-red-500', 'bg-teal-500', 'bg-indigo-500', 'bg-pink-500'];
+            
+            // Update storage totals
+            document.getElementById('totalUsed').textContent = `${results.total_used_gb ? results.total_used_gb.toFixed(1) : '--'} GB used`;
+            
+            // Clear and rebuild storage map with real data
+            map.innerHTML = '';
+            
+            if (results.categories) {
+                const catKeys = Object.keys(results.categories);
+                const catValues = Object.values(results.categories);
+                
+                catKeys.forEach((cat, i) => {
+                    const size = catValues[i] || 0;
+                    const colSpan = Math.max(1, Math.floor(size / 5));
+                    const rowSpan = Math.max(1, Math.floor(size / 10));
+                    
+                    const div = document.createElement('div');
+                    div.className = `${colors[i % colors.length]} rounded-lg treemap-item relative group cursor-pointer hover:opacity-90 transition-opacity`;
+                    div.style.gridColumn = `span ${colSpan}`;
+                    div.style.gridRow = `span ${rowSpan}`;
+                    div.title = `${cat}: ${size.toFixed(1)} GB`;
+                    div.innerHTML = `
+                        <div class="absolute inset-0 flex items-center justify-center text-white font-bold text-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                            ${categories[i] || cat}
+                        </div>
+                        <div class="absolute bottom-2 left-2 right-2 text-xs opacity-90 truncate">
+                            ${(size * 1024).toFixed(0)} MB
+                        </div>
+                    `;
+                    
+                    div.onclick = () => showCategoryDetails(cat, size);
+                    map.appendChild(div);
+                });
+            }
+            
+            // Populate category bars with real data
+            renderCategoryBars(results.categories);
+            
+            // Show results section
+            document.getElementById('storageResults').classList.remove('hidden');
+            showSection('storage');
+            
+            // Prepare cleanup categories based on results
+            prepareCleanupCategories();
+        }
+        
+        // Render category distribution bars
+        function renderCategoryBars(categories) {
+            const container = document.getElementById('categoryBars');
+            container.innerHTML = '';
+            
+            const total = Object.values(categories).reduce((a, b) => a + b, 0);
+            if (total === 0) return;
+            
+            const catNames = ['Applications', 'Videos', 'Documents', 'Images', 'Music', 'Downloads', 'System', 'Other'];
+            const icons = ['💿', '🎬', '📄', '🖼️', '🎵', '📥', '⚙️', '📦'];
+            const colors = ['text-blue-500', 'text-green-500', 'text-purple-500', 'text-orange-500', 'text-red-500', 'text-teal-500', 'text-indigo-500', 'text-pink-500'];
+            
+            Object.entries(categories).forEach(([name, size], index) => {
+                const percentage = ((size / total) * 100).toFixed(1);
+                const icon = icons[index % icons.length];
+                const colorClass = colors[index % colors.length];
+                
+                const barContainer = document.createElement('div');
+                barContainer.className = 'mb-6';
+                barContainer.innerHTML = `
+                    <div class="flex justify-between mb-2">
+                        <div class="flex items-center gap-2">
+                            <span class="text-lg">${icon}</span>
+                            <span class="font-semibold text-neutral-700 dark:text-neutral-300">${name}</span>
+                        </div>
+                        <span class="text-sm text-neutral-500">${percentage}% (${size.toFixed(1)} GB)</span>
+                    </div>
+                    <div class="w-full bg-neutral-200 dark:bg-neutral-700 rounded-full h-3 overflow-hidden">
+                        <div class="bg-brand-500 h-full rounded-full progress-bar" style="width: ${percentage}%"></div>
+                    </div>
+                `;
+                container.appendChild(barContainer);
+            });
+        }
+        
+        // Show category details tooltip
+        function showCategoryDetails(category, size) {
+            alert(`${category} files:\nSize: ${size.toFixed(1)} GB\nThis category could be cleaned up.`);
+        }
+        
+        // Prepare cleanup categories based on scan results
+        function prepareCleanupCategories() {
+            // This will populate the cleanup categories section
+            // In the full implementation, this would fetch file lists from the API
+            const cleanupSection = document.getElementById('cleanup-section');
+            cleanupSection.classList.remove('hidden');
+            
+            const categories = [
+                { id: 'temp', name: 'Temporary Files', icon: '🗑️', count: 'Scanning...', size: 'Calculating...' },
+                { id: 'duplicates', name: 'Duplicate Files', icon: '🔄', count: 'Scanning...', size: 'Calculating...' },
+                { id: 'large', name: 'Large Files (>1GB)', icon: '💾', count: 'Scanning...', size: 'Calculating...' },
+                { id: 'downloads', name: 'Old Downloads', icon: '📥', count: 'Pending', size: '-' },
+                { id: 'cache', name: 'System Cache', icon: '💰', count: 'Pending', size: '-' }
+            ];
+            
+            renderCleanupCategoriesWithRealData(categories);
+        }
+        
+        // Render cleanup categories with real data from API
+        function renderCleanupCategoriesWithRealData(categories) {
+            const container = document.getElementById('cleanupCategories');
+            container.innerHTML = '';
+            
+            categories.forEach(cat => {
+                const card = document.createElement('div');
+                card.className = 'bg-white dark:bg-neutral-800 rounded-xl p-6 file-card cursor-pointer border-2 border-transparent hover:border-brand-500';
+                card.id = cat.id + '-card';
+                card.innerHTML = `
+                    <div class="flex items-start gap-4">
+                        <input type="checkbox" class="mt-1 w-5 h-5 rounded border-gray-300 text-brand-500 focus:ring-brand-500" disabled>
+                        <div class="flex-1">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-3">
+                                    <span class="text-2xl">${cat.icon}</span>
+                                    <h3 class="font-bold text-lg">${cat.name}</h3>
+                                </div>
+                                <span class="text-sm text-neutral-500">${cat.count} files • ${cat.size}</span>
+                            </div>
+                            <p class="text-sm text-neutral-600 dark:text-neutral-400 mt-1">Loading data from scan...</p>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
         // Theme Toggle
         function toggleTheme() {
             const html = document.documentElement;
@@ -254,40 +396,135 @@
             }
         }
 
-        // Scan Drive (Simulated)
-        function scanDrive() {
+        // API Configuration
+        const API_BASE_URL = '/api/v1';
+        
+        async function scanDrive(drive = 'C:') {
             const modal = document.getElementById('scanModal');
             const progressBar = document.getElementById('scanProgress');
             const statusText = document.getElementById('scanStatus');
-            const title = document.getElementById('scanTitle');
             
             modal.classList.remove('hidden');
-            let progress = 0;
-            progress.style.width = '0%';
+            progressBar.style.width = '5%';
+            statusText.textContent = 'Initializing scan...';
             
-            const scanSteps = [
-                { msg: 'Analyzing file system...', delay: 500 },
-                { msg: 'Scanning large files...', delay: 800 },
-                { msg: 'Checking for duplicates...', delay: 600 },
-                { msg: 'Identifying temporary files...', delay: 400 },
-                { msg: 'Calculating statistics...', delay: 300 }
-            ];
-            
-            let currentStep = 0;
-            
-            const interval = setInterval(() => {
-                if (currentStep < scanSteps.length) {
-                    progress.style.width = ((currentStep + 1) / scanSteps.length * 100) + '%';
-                    statusText.textContent = scanSteps[currentStep].msg;
-                    currentStep++;
-                } else {
-                    clearInterval(interval);
-                    modal.classList.add('hidden');
-                    document.getElementById('storageResults').classList.remove('hidden');
-                    populateStorageData();
-                    renderCleanupCategories();
+            try {
+                // Start scan via API
+                const response = await fetch(`${API_BASE_URL}/scan/start`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({drive: drive})
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Scan failed: ${response.statusText}`);
                 }
-            }, scanSteps[currentStep]?.delay || 100);
+                
+                const data = await response.json();
+                const scanId = data.scan_id;
+                
+                statusText.textContent = `Scan started (${drive}). Waiting for results...`;
+                progressBar.style.width = '20%';
+                
+                // Poll for scan completion
+                let attempts = 0;
+                const maxAttempts = 180; // 3 minutes total
+                
+                while (attempts < maxAttempts) {
+                    await sleep(1000); // Wait 1 second between polls
+                    attempts++;
+                    
+                    const statusResponse = await fetch(`${API_BASE_URL}/scan/status/${scanId}`);
+                    const statusData = await statusResponse.json();
+                    
+                    if (statusData.status === 'complete') {
+                        progressBar.style.width = '100%';
+                        statusText.textContent = 'Scan complete! Loading results...';
+                        
+                        // Get detailed results
+                        const resultsResponse = await fetch(`${API_BASE_URL}/scan/results/${scanId}`);
+                        if (resultsResponse.ok) {
+                            const results = await resultsResponse.json();
+                            displayScanResults(results, scanId);
+                        } else {
+                            // Fallback: use static results if endpoint unavailable
+                            populateStorageData();
+                            renderCleanupCategories();
+                        }
+                        
+                        setTimeout(() => {
+                            modal.classList.add('hidden');
+                        }, 500);
+                        break;
+                    } else if (statusData.status === 'running') {
+                        // Update progress based on scan phase
+                        const progress = statusData.progress || Math.min(80, (attempts / maxAttempts) * 80);
+                        progressBar.style.width = `${progress}%`;
+                        
+                        // Dynamic status messages based on progress
+                        if (attempts < 30) {
+                            statusText.textContent = 'Analyzing file system structure...';
+                        } else if (attempts < 90) {
+                            statusText.textContent = 'Computing file hashes and finding duplicates...';
+                        } else if (attempts < 150) {
+                            statusText.textContent = 'Calculating statistics and categorizing files...';
+                        }
+                    }
+                }
+                
+                if (attempts >= maxAttempts) {
+                    throw new Error('Scan timed out');
+                }
+                
+            } catch (error) {
+                console.error('Scan error:', error);
+                modal.classList.add('hidden');
+                
+                // Show user-friendly error message
+                const errorMsg = document.createElement('div');
+                errorMsg.className = 'fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-6';
+                errorMsg.innerHTML = `
+                    <div class="bg-white dark:bg-neutral-800 rounded-2xl p-8 max-w-md w-full shadow-2xl">
+                        <div class="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center mb-4">
+                            <svg class="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </div>
+                        <h3 class="font-bold text-lg mb-2">Scan Failed</h3>
+                        <p class="text-neutral-600 dark:text-neutral-400 mb-4">${error.message}</p>
+                        <p class="text-sm text-neutral-500 mb-4">Make sure the EatUp Pro API server is running on port 5000.</p>
+                        <button onclick="this.closest('.fixed').classList.add('hidden')" class="px-6 py-3 bg-brand-500 text-white rounded-lg font-semibold hover:bg-brand-600">Dismiss</button>
+                    </div>
+                `;
+                document.body.appendChild(errorMsg);
+                
+                // Fall back to demo mode for local testing
+                statusText.textContent = 'Running in demo mode (server not available)...';
+                progressBar.style.width = '0%';
+                
+                const demoSteps = [
+                    { msg: 'Analyzing file system...', delay: 500 },
+                    { msg: 'Scanning large files...', delay: 800 },
+                    { msg: 'Checking for duplicates...', delay: 600 },
+                    { msg: 'Identifying temporary files...', delay: 400 },
+                    { msg: 'Calculating statistics...', delay: 300 }
+                ];
+                
+                let currentStep = 0;
+                const interval = setInterval(() => {
+                    if (currentStep < demoSteps.length) {
+                        progressBar.style.width = ((currentStep + 1) / demoSteps.length * 100) + '%';
+                        statusText.textContent = demoSteps[currentStep].msg;
+                        currentStep++;
+                    } else {
+                        clearInterval(interval);
+                        modal.classList.add('hidden');
+                        document.getElementById('storageResults').classList.remove('hidden');
+                        populateStorageData(); // Still show demo data
+                        renderCleanupCategories();
+                    }
+                }, demoSteps[currentStep]?.delay || 100);
+            }
         }
 
         // Populate Storage Data
@@ -405,39 +642,82 @@
             document.getElementById('totalSpace').textContent = '19.1 GB';
         }
 
-        // Execute Cleanup
-        function confirmCleanup() {
+        // Execute Cleanup via API
+        async function performCleanup(cleanupType = 'smart') {
+            const modal = document.getElementById('scanModal');
+            const progressBar = document.getElementById('scanProgress');
+            const statusText = document.getElementById('scanStatus');
+            
+            modal.classList.remove('hidden');
+            progressBar.style.width = '5%';
+            statusText.textContent = `Starting ${cleanupType} cleanup...`;
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/cleanup/run`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({type: cleanupType})
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Cleanup failed: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                // Update progress
+                progressBar.style.width = '40%';
+                statusText.textContent = 'Processing files...';
+                
+                // Wait a moment then show results
+                await sleep(1500);
+                
+                modal.classList.add('hidden');
+                
+                // Show results
+                displayCleanupResults(data.space_freed_mb || 0, cleanupType);
+                
+            } catch (error) {
+                console.error('Cleanup error:', error);
+                modal.classList.add('hidden');
+                
+                // Show error in demo mode
+                alert(`Demo Mode: Cleanup would free up space.\n\nNote: The backend server is not running.\nRun python api_server.py to enable full functionality.`);
+            }
+        }
+        
+        // Display cleanup results
+        function displayCleanupResults(spaceFreedMB, type) {
+            const spaceFreedGB = spaceFreedMB / 1024;
+            
+            document.querySelectorAll('main > section').forEach(s => s.classList.add('hidden'));
+            document.getElementById('results-section').classList.remove('hidden');
+            
+            // Update result display
+            const resultElement = document.querySelector('#results-section p.text-6xl.font-bold.mb-4');
+            if (resultElement) {
+                resultElement.textContent = `${spaceFreedGB.toFixed(1)} GB`;
+            }
+        }
+        
+        // Quick Clean Functions - Updated to use API
+        async function quickClean(type) {
+            showSection('cleanup');
+            await performCleanup(type);
+        }
+        
+        // Cleanup operations
+        async function confirmCleanup() {
             document.getElementById('confirmDialog').showModal();
         }
-
+        
         function closeDialog() {
             document.getElementById('confirmDialog').close();
         }
-
-        function executeCleanup() {
+        
+        async function executeCleanup() {
             closeDialog();
-            document.getElementById('cleanup-section').classList.add('hidden');
-            document.getElementById('results-section').classList.remove('hidden');
-        }
-
-        // Quick Clean Functions
-        function quickClean(type) {
-            showSection('cleanup');
-            const modal = document.getElementById('scanModal');
-            const title = document.getElementById('scanTitle');
-            const status = document.getElementById('scanStatus');
-            const progress = document.getElementById('scanProgress');
-            
-            modal.classList.remove('hidden');
-            progress.style.width = '0%';
-            
-            setTimeout(() => { progress.style.width = '50%'; }, 300);
-            setTimeout(() => { 
-                modal.classList.add('hidden');
-                document.getElementById('cleanupPreview').classList.remove('hidden');
-                document.getElementById('totalSpace').textContent = '12.4 GB';
-                renderFilesList();
-            }, 1000);
+            await performCleanup('temp'); // Default to temp file cleanup
         }
 
         // Deselect All
@@ -451,7 +731,26 @@
             if (localStorage.getItem('theme') === 'dark') {
                 document.documentElement.classList.add('dark');
             }
-            document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+            
+            // Setup theme toggle
+            const themeToggle = document.getElementById('themeToggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', toggleTheme);
+            }
+            
+            // Setup mobile menu button
+            const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+            if (mobileMenuBtn) {
+                mobileMenuBtn.addEventListener('click', toggleMobileMenu);
+            }
+            
+            // Bind quick action buttons to performCleanup
+            document.querySelectorAll('[onclick^="quickClean"]').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const type = this.getAttribute('onclick').match(/quickClean\('(.*?)'\)/)[1];
+                    performCleanup(type);
+                });
+            });
         });
     </script>
 </body>
