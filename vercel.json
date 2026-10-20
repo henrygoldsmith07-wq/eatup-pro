@@ -1,0 +1,40 @@
+{
+  "version": 2,
+  "name": "eatup-pro",
+  "builds": [
+    {
+      "src": "index.html",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "api/**/*.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "index.html"
+    },
+    {
+      "src": "/api/v1/(.*)",
+      "dest": "/api/v1/$1"
+    }
+  ],
+  "env": {
+    "PORT": "8080",
+    "DEBUG": "false",
+    "API_KEY": "@api_key"
+  },
+  "headers": [
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    }
+  ]
+}
