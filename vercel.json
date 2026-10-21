@@ -1,6 +1,16 @@
 {
   "version": 2,
   "name": "eatup-pro",
+  "builds": [
+    {
+      "src": "*.html",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "i18n/*.json",
+      "use": "@vercel/static"
+    }
+  ],
   "headers": [
     {
       "source": "/assets/(.*)",
