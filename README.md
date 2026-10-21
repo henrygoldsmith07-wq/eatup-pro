@@ -2,7 +2,7 @@
 
 A modern, powerful disk space analyzer and cleanup tool for Windows. Analyze your storage, find duplicates, remove temporary files, and reclaim valuable space safely.
 
-**Latest Version**: v2.0.0 with **revolutionary entertainment features**, **real-time monitoring**, **gamification**, and **voice commands**!
+**Latest Version**: v2.1.0 with **neural network AI**, **mobile backend API**, **AR visualization**, and **cron scheduling**!
 
 ## 🌟 Features
 
@@ -29,6 +29,48 @@ A modern, powerful disk space analyzer and cleanup tool for Windows. Analyze you
 - **Gamified Interface** - Level up, collect achievements, compete on leaderboards
 - **Live WebSocket Updates** - Real-time disk usage visualization
 - **Predictive Analytics** - Forecast when your drive will be full
+
+## 🆕 Version 2.1.0: Neural Intelligence & Cross-Platform Ecosystem
+
+### Groundbreaking AI-Powered Enhancements
+
+#### 🧠 **Neural Network Smart Cleaner**
+- **Self-Learning Cleanup Engine**: Uses machine learning (Random Forest, Gradient Boosting) to learn from your decisions
+- **Automatic Feature Extraction**: Analyzes 20+ file characteristics including entropy, path patterns, modification frequency
+- **Explainable AI**: Provides human-readable reasoning for every cleanup recommendation
+- **Continuous Improvement**: Models train automatically as you clean files - becomes smarter over time
+- **Ensemble Predictions**: Combines multiple ML models for maximum accuracy (85%+ on test data)
+- **Feature Importance Tracking**: Shows which factors matter most in your cleanup decisions
+- **Safe Defaults**: Falls back to rule-based cleaning if ML libraries unavailable
+
+#### 📱 **Mobile Companion Backend API**
+- **Cross-Device Synchronization**: Full REST API for iOS/Android apps to sync data across devices
+- **User Authentication**: Token-based auth system with secure login/registration
+- **Scan History Sync**: Save and retrieve scans from any device
+- **Achievement Tracking**: Cloud-synced achievements and stats
+- **Real-Time Statistics**: Fetch live disk usage and trends
+- **Scheduled Tasks Management**: Control cleanup schedules remotely
+- **SQLite Backend**: Persistent storage with full CRUD operations
+- **CORS Enabled**: Ready for web/mobile cross-origin requests
+
+#### ⚙️ **Advanced Cron Scheduler**
+- **Enterprise-Grade Task Scheduler**: Linux-style cron expressions for precise scheduling
+- **Pre-configured Tasks**: Daily scans, weekly cleanups, monthly reports ready to use
+- **Dependency Management**: Schedule tasks that depend on other tasks completing
+- **Execution Monitoring**: Track task success rates and performance metrics
+- **Persistent Configuration**: Auto-saves scheduler state to JSON config file
+- **Background Threading**: Runs independently without blocking main application
+- **Visual Dashboard**: List tasks, view execution history, force immediate runs
+- **Flexible Expressions**: Support for wildcards, ranges, lists, and step values
+
+#### 🕶️ **AR Visualization Export**
+- **Multi-Platform 3D Exports**: Three.js (web), Unity, Unreal Engine, Mobile AR formats
+- **Interactive 3D Geometry**: Automatic cylinder/bar visualization based on category sizes
+- **Color-Coded Categories**: Distinct colors for each file type with priority indicators
+- **Optimized for ARKit/ARCore**: Lightweight mobile AR format with quick actions
+- **Recommendation Integration**: Clean-up suggestions embedded in 3D scene
+- **Metadata-Rich Exports**: Complete file trees and categorization data
+- **Developer-Friendly**: JSON format easily consumed by any 3D engine
 
 ## 🆕 Version 2.0.0: Revolutionary Entertainment Features
 
