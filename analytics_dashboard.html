@@ -148,14 +148,14 @@
 
     <script>
         // API Configuration
-        const API_BASE = 'http://localhost:5000/api/v1';
+        const API_BASE = '/api/v1';
         
         let usageChart, pieChart;
 
         async function fetchData() {
             try {
                 // Get usage stats
-                const statsResponse = await fetch(`${API_URL}/usage/stats`);
+                const statsResponse = await fetch(`${API_BASE}/usage/stats`);
                 const stats = await statsResponse.json();
                 
                 // Update metrics

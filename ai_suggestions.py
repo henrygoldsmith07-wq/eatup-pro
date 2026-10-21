@@ -11,7 +11,6 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Dict, Any, Tuple
 from dataclasses import dataclass
-import random
 
 
 @dataclass
@@ -73,9 +72,9 @@ class AISuggestionEngine:
         return {
             'filepath': filepath,
             'size_mb': stats.get('size', 0) / (1024 * 1024),
-            'age_days': self._get_file_age(days=True),
+            'age_days': features.file_age_days,
             'features': {
-                'age_days': features.age_age_days,
+                'age_days': features.file_age_days,
                 'ext_entropy': features.ext_entropy,
                 'path_depth': features.path_depth
             },
@@ -364,7 +363,7 @@ class AISuggestionEngine:
             'predicted_full_date': (now + timedelta(days=90)).strftime('%Y-%m-%d'),
             'recommendation_count': len(self.deletion_history),
             'success_rate': 0.85,
-            'risk_assessment': 'low' if random.random() > 0.3 else 'moderate'
+            'risk_assessment': 'low'
         }
 
 

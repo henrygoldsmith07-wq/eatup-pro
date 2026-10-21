@@ -1,14 +1,19 @@
 const { app, BrowserWindow, ipcMain, Menu } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const { spawn } = require('child_process');
 let pythonProcess = null;
+let tray = null;
+
+const PORT = process.env.PORT || 5000;
+const BACKEND_URL = `http://127.0.0.1:${PORT}`;
+const PROJECT_ROOT = path.join(__dirname, '..');
 
 // Python backend process
 function startPythonBackend() {
-    const port = process.env.PORT || 5000;
     pythonProcess = spawn('python', ['api_server.py'], {
-        cwd: __dirname,
-        env: { ...process.env, PORT: port }
+        cwd: PROJECT_ROOT,
+        env: { ...process.env, PORT: PORT }
     });
 
     pythonProcess.stdout.on('data', (data) => {
@@ -20,21 +25,40 @@ function startPythonBackend() {
     });
 }
 
-function createWindow() {
+async function waitForBackend(timeoutMs = 15000) {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+        try {
+            const res = await fetch(`${BACKEND_URL}/api/v1/health`);
+            if (res.ok) return true;
+        } catch (e) {
+            // Not listening yet
+        }
+        await new Promise(resolve => setTimeout(resolve, 300));
+    }
+    return false;
+}
+
+async function createWindow() {
     const mainWindow = new BrowserWindow({
         width: 1200,
         height: 800,
         webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false
+            // The UI loads third-party CDN scripts, so it must not get Node access
+            nodeIntegration: false,
+            contextIsolation: true
         },
         icon: path.join(__dirname, 'assets', 'icon.png'),
         show: false,
         backgroundColor: '#fbfbfd'
     });
 
-    // Load the web app
-    mainWindow.loadFile('../index.html');
+    // Serve the UI from the backend so its relative /api/v1 calls resolve
+    if (await waitForBackend()) {
+        mainWindow.loadURL(`${BACKEND_URL}/app.html`);
+    } else {
+        mainWindow.loadFile(path.join(PROJECT_ROOT, 'app.html'));  // Demo mode
+    }
 
     // Show when ready
     mainWindow.once('ready-to-show', () => {
@@ -52,6 +76,7 @@ function createWindow() {
                 { role: 'quit' }
             ]
         },
+        { role: 'editMenu' },
         {
             label: 'View',
             submenu: [
@@ -73,19 +98,7 @@ function createWindow() {
                 },
                 {
                     label: 'Smart Cleanup',
-                    accelerator: 'CmdOrCtrl+C',
                     click: () => mainWindow.webContents.send('cleanup-run', { type: 'smart' })
-                },
-                {
-                    label: 'Scheduled Tasks',
-                    click: () => {
-                        const scheduleWindow = new BrowserWindow({
-                            width: 600,
-                            height: 500,
-                            parent: mainWindow
-                        });
-                        scheduleWindow.loadFile('../scheduler.html');
-                    }
                 }
             ]
         }
@@ -96,11 +109,12 @@ function createWindow() {
 }
 
 function setupTray(parentWindow) {
-    const tray = require('electron'). Tray;
+    const { Tray } = require('electron');
     const iconPath = path.join(__dirname, 'assets', 'icon.ico');
+    if (!fs.existsSync(iconPath)) return;
 
-    const trayIcon = new tray(iconPath);
-    
+    tray = new Tray(iconPath);  // Module-level so it isn't garbage collected
+
     tray.setToolTip('EatUp Pro - Disk Cleanup Tool');
 
     const contextMenu = Menu.buildFromTemplate([
@@ -131,7 +145,7 @@ app.whenReady().then(() => {
 
     // Expose Python API to JavaScript
     ipcMain.handle('start-scan', async () => {
-        return fetch('http://localhost:5000/api/v1/scan/start', {
+        return fetch(`${BACKEND_URL}/api/v1/scan/start`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ drive: 'C:' })
@@ -139,7 +153,7 @@ app.whenReady().then(() => {
     });
 
     ipcMain.handle('run-cleanup', async (event, { type }) => {
-        return fetch('http://localhost:5000/api/v1/cleanup/run', {
+        return fetch(`${BACKEND_URL}/api/v1/cleanup/run`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ type })
@@ -147,12 +161,12 @@ app.whenReady().then(() => {
     });
 
     ipcMain.handle('get-usage-stats', async () => {
-        return fetch('http://localhost:5000/api/v1/usage/stats')
+        return fetch(`${BACKEND_URL}/api/v1/usage/stats`)
             .then(res => res.json());
     });
 
     ipcMain.handle('health-check', async () => {
-        return fetch('http://localhost:5000/api/v1/health')
+        return fetch(`${BACKEND_URL}/api/v1/health`)
             .then(res => res.json());
     });
 

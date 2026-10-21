@@ -57,9 +57,8 @@ A modern, powerful disk space analyzer and cleanup tool for Windows. Analyze you
    # Command-line version
    python cleaner.py
    
-   # Or launch the web interface
-   start index.html
-   start app.html
+   # Or start the API server, then open http://localhost:5000/app.html
+   python api_server.py
    ```
 
 ## 🎯 Usage Guide
@@ -67,9 +66,15 @@ A modern, powerful disk space analyzer and cleanup tool for Windows. Analyze you
 ### Quick Start
 
 #### Method 1: Web Interface (Recommended)
-1. Open `index.html` in your browser - This is the landing page
-2. Click "Launch EatUp Pro" to open `app.html` - The actual application
+1. Run `python api_server.py` - it serves both the UI and the API on `127.0.0.1:5000`
+2. Open http://localhost:5000/app.html
 3. Follow the on-screen instructions
+
+Opening `app.html` directly from disk (or from the Vercel deployment) runs it in demo mode with sample data.
+
+The server only listens on localhost by default. Set `API_KEY` to require an `X-API-Key` header on
+destructive endpoints, `HOST` to change the bind address, and `CORS_ORIGINS` (comma-separated) if a UI
+on another origin needs access.
 
 #### Method 2: Command Line
 ```bash
@@ -106,7 +111,7 @@ The tool analyzes and categorizes files into:
 
 | Category | Description | Safe to Clean? |
 |----------|-------------|----------------|
-| Temporary | `.tmp`, `.temp`, cache files | ✅ Yes |
+| Temporary | Files in `AppData\Local\Temp`, `Windows\Temp`, `C:\Temp`, plus `.tmp`/`.temp`/`.crdownload`/`.part`/`~$*` files older than a day | ✅ Yes |
 | Downloads | ISO files, installers | ⚠️ Review first |
 | Duplicates | Identical files | ✅ Yes |
 | Large Files | >1GB files | ⚠️ Verify importance |
@@ -176,7 +181,7 @@ colors: {
 
 ### Dependencies missing
 ```bash
-pip install winshell psutil colorama
+pip install -r requirements.txt
 ```
 
 ### Can't delete certain files
@@ -200,27 +205,37 @@ result = cleaner.scan_drive("C:")
 # Get specific file types
 temp_files = cleaner.get_temp_files_list(limit=50)
 
-# Perform cleanup (dry run first!)
-cleaned = cleaner.smart_cleanup(dry_run=True)
+# Duplicates are only cleaned after they have been found
+cleaner.find_duplicates()
 
-print(f"Will free: {cleaned / (1024*1024*1024):.2f} GB")
+# Perform cleanup (dry run first!)
+preview = cleaner.smart_cleanup(dry_run=True)
+
+print(f"Will free: {preview.freed_bytes / (1024**3):.2f} GB from {preview.files_deleted} files")
 
 # Actually execute
-cleaned = cleaner.smart_cleanup(dry_run=False)
+result = cleaner.smart_cleanup(dry_run=False)
+print(result.errors)  # Files that could not be moved to the Recycle Bin
 ```
 
 ### Adding New Categories
 
-Extend `_classify_file()` method:
+Add the name to `CATEGORIES` in `cleaner.py` and extend `_classify_file()`:
 
 ```python
-def _classify_file(self, ext, filepath, filename):
+@staticmethod
+def _classify_file(filepath: Path) -> str:
     # Add new extension groups
-    my_exts = {'.myformat', '.another'}
-    if ext in my_exts:
+    if filepath.suffix.lower() in {'.myformat', '.another'}:
         return 'MyCustomCategory'
     
     # ... existing code
+```
+
+## 🧪 Testing
+
+```bash
+python -m pytest
 ```
 
 ## 📝 License & Credits
