@@ -428,7 +428,7 @@
                 
                 // Poll for scan completion
                 let attempts = 0;
-                const maxAttempts = 180; // 3 minutes total
+                const maxAttempts = 600; // 10 minutes: duplicate detection hashes file contents
                 
                 while (attempts < maxAttempts) {
                     await sleep(1000); // Wait 1 second between polls
@@ -436,6 +436,10 @@
                     
                     const statusResponse = await fetch(`${API_BASE_URL}/scan/status/${scanId}`);
                     const statusData = await statusResponse.json();
+                    
+                    if (statusData.status === 'failed') {
+                        throw new Error(statusData.message);
+                    }
                     
                     if (statusData.status === 'complete') {
                         progressBar.style.width = '100%';

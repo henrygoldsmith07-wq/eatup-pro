@@ -6,30 +6,49 @@ Provides web-based interface for all functionality
 
 import os
 import sys
+import hmac
 import json
+import time
 from datetime import datetime
-from pathlib import Path
-from flask import Flask, request, jsonify, send_file, Response
+from flask import Flask, request, jsonify, send_from_directory, abort
 from flask_cors import CORS
 from functools import wraps
 import threading
 import uuid
+import psutil
 
 # Import local modules
-sys.path.append(os.path.dirname(__file__))
-from cleaner import EatUpCleaner
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(BASE_DIR)
+from cleaner import EatUpCleaner, CleanupResult, GB
 from scheduler import SchedulerManager
 from cloud_storage import CloudStorageManager
 from data.analytics_db import AnalyticsDatabase
 
-app = Flask(__name__)
-CORS(app)  # Enable Cross-Origin Resource Sharing
+API_VERSION = '1.2.0'
+START_TIME = time.time()
+HOST = os.getenv('HOST', '127.0.0.1')
+LOCAL_HOSTNAMES = {'localhost', '127.0.0.1', '[::1]'}
+UI_PAGES = {'index.html', 'app.html', 'features.html', 'analytics_dashboard.html'}
+
+app = Flask(__name__, static_folder=None)
+
+# The UI is served from this server, so cross-origin access is off unless
+# explicitly configured (comma-separated origins).
+cors_origins = [o.strip() for o in os.getenv('CORS_ORIGINS', '').split(',') if o.strip()]
+if cors_origins:
+    CORS(app, origins=cors_origins)
 
 # Global instances
 cleaner = None
 scheduler = None
 cloud_manager = None
 db = None
+
+# Scan jobs: scan_id -> {'status', 'drive', 'error', 'started_at', 'finished_at'}
+scan_jobs = {}
+scan_lock = threading.Lock()
+latest_scan_id = None
 
 
 def get_cleaner():
@@ -64,17 +83,52 @@ def get_db():
     return db
 
 
+@app.before_request
+def reject_foreign_hosts():
+    """Block DNS-rebinding attacks while bound to loopback"""
+    if HOST in ('127.0.0.1', 'localhost', '::1'):
+        hostname = request.host
+        if not hostname.endswith(']'):  # Strip the port, keeping bracketed IPv6
+            hostname = hostname.rsplit(':', 1)[0]
+        if hostname not in LOCAL_HOSTNAMES:
+            abort(403)
+
+
 # Helper decorators
 def require_auth(f):
-    """Simple authentication decorator (can be enhanced with JWT)"""
+    """Require the API key when one is configured, and a JSON body on writes.
+
+    Requiring application/json forces a CORS preflight, so other websites open
+    in the user's browser cannot trigger destructive endpoints.
+    """
     @wraps(f)
     def decorated(*args, **kwargs):
-        # Check for API key in header
-        api_key = request.headers.get('X-API-Key')
-        if os.getenv('API_KEY') and api_key != os.getenv('API_KEY'):
+        expected = os.getenv('API_KEY')
+        api_key = request.headers.get('X-API-Key', '')
+        if expected and not hmac.compare_digest(api_key, expected):
             return jsonify({'error': 'Unauthorized'}), 401
+        if request.method == 'POST' and not request.is_json:
+            return jsonify({'error': 'Content-Type must be application/json'}), 415
         return f(*args, **kwargs)
     return decorated
+
+
+def is_scan_running():
+    return any(job['status'] == 'running' for job in scan_jobs.values())
+
+
+# ==================== WEB UI ====================
+
+@app.route('/')
+def ui_index():
+    return send_from_directory(BASE_DIR, 'index.html')
+
+
+@app.route('/<page>')
+def ui_page(page):
+    if page not in UI_PAGES:
+        abort(404)
+    return send_from_directory(BASE_DIR, page)
 
 
 # ==================== HEALTH & STATUS ====================
@@ -84,120 +138,116 @@ def health_check():
     """Health check endpoint"""
     return jsonify({
         'status': 'healthy',
-        'version': '1.0.0',
+        'version': API_VERSION,
         'timestamp': datetime.now().isoformat(),
-        'uptime_seconds': get_uptime()
+        'uptime_seconds': round(time.time() - START_TIME)
     })
-
-
-def get_uptime():
-    """Get server uptime (simplified)"""
-    # In production, track start time at startup
-    return 0
 
 
 # ==================== CORE CLEANING OPERATIONS ====================
 
 @app.route('/api/v1/scan/start', methods=['POST'])
+@require_auth
 def scan_start():
-    """Start a new drive scan"""
-    try:
-        data = request.json or {}
-        drive = data.get('drive', 'C:')
-        
-        cleaner_obj = get_cleaner()
-        
-        # Start scan in background thread
-        def run_scan():
-            result = cleaner_obj.scan_drive(drive)
-            return result
-        
-        thread = threading.Thread(target=run_scan, daemon=True)
-        thread.start()
-        
-        return jsonify({
-            'status': 'starting',
-            'message': f'Started scanning {drive}',
-            'scan_id': generate_scan_id()
-        })
+    """Start a new drive scan in the background"""
+    data = request.json or {}
+    drive = data.get('drive', 'C:')
+    with_duplicates = data.get('find_duplicates', True)
     
+    with scan_lock:
+        running = next((sid for sid, job in scan_jobs.items() if job['status'] == 'running'), None)
+        if running:
+            return jsonify({'error': 'A scan is already running', 'scan_id': running}), 409
+        scan_id = str(uuid.uuid4())
+        scan_jobs[scan_id] = {'status': 'running', 'drive': drive, 'error': None,
+                              'started_at': time.time(), 'finished_at': None}
+    
+    threading.Thread(target=run_scan, args=(scan_id, drive, with_duplicates), daemon=True).start()
+    
+    return jsonify({
+        'status': 'starting',
+        'message': f'Started scanning {drive}',
+        'scan_id': scan_id
+    })
+
+
+def run_scan(scan_id, drive, with_duplicates):
+    """Background worker: scan, optionally find duplicates, persist the result"""
+    global latest_scan_id
+    job = scan_jobs[scan_id]
+    try:
+        cleaner_obj = get_cleaner()
+        results = cleaner_obj.scan_drive(drive)
+        if with_duplicates:
+            cleaner_obj.find_duplicates()
+        
+        duration = time.time() - job['started_at']
+        get_db().save_scan({
+            'scan_id': scan_id,
+            'drive': drive,
+            'total_used_bytes': results.total_used,
+            'total_space_bytes': results.total_space,
+            'utilization_percent': (results.total_used / results.total_space * 100) if results.total_space > 0 else 0,
+            'categories_json': json.dumps(results.categories),
+            'temp_files_count': len(results.temp_files),
+            'duplicate_groups_count': len(results.duplicates),
+            'large_files_count': len(results.large_files),
+            'cleanable_bytes': results.cleanable_size,
+            'status': 'complete'
+        }, duration=duration)
+        job['status'] = 'complete'
+        latest_scan_id = scan_id
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        job['status'] = 'failed'
+        job['error'] = str(e)
+    finally:
+        job['finished_at'] = time.time()
 
 
 @app.route('/api/v1/scan/status/<scan_id>', methods=['GET'])
 def scan_status(scan_id):
     """Get scan status"""
-    try:
-        # Check if scan is complete
-        cleaner_obj = get_cleaner()
-        
-        if cleaner_obj.scan_results and not hasattr(cleaner_obj, '_scan_in_progress'):
-            # Scan completed, save to database
-            db = get_db()
-            
-            categories_json = json.dumps(cleaner_obj.scan_results.categories)
-            
-            scan_data = {
-                'scan_id': scan_id,
-                'drive': 'C:',
-                'total_used_bytes': cleaner_obj.scan_results.total_used,
-                'total_space_bytes': cleaner_obj.scan_results.total_space,
-                'utilization_percent': (cleaner_obj.scan_results.total_used / cleaner_obj.scan_results.total_space * 100) if cleaner_obj.scan_results.total_space > 0 else 0,
-                'categories_json': categories_json,
-                'temp_files_count': len(cleaner_obj.scan_results.temp_files),
-                'duplicate_groups_count': len(cleaner_obj.scan_results.duplicates),
-                'large_files_count': len(cleaner_obj.scan_results.large_files),
-                'cleanable_bytes': cleaner_obj.scan_results.cleanable_size,
-                'status': 'complete'
-            }
-            
-            db.save_scan(scan_data)
-            
-            return jsonify({
-                'scan_id': scan_id,
-                'status': 'complete',
-                'progress': 100,
-                'message': 'Scan completed successfully'
-            })
-        
-        return jsonify({
-            'scan_id': scan_id,
-            'status': 'running',
-            'progress': 50,
-            'message': 'Scanning in progress...'
-        })
+    job = scan_jobs.get(scan_id)
+    if job is None:
+        return jsonify({'error': 'Unknown scan_id'}), 404
     
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    messages = {
+        'running': 'Scanning in progress...',
+        'complete': 'Scan completed successfully',
+        'failed': f"Scan failed: {job['error']}"
+    }
+    return jsonify({
+        'scan_id': scan_id,
+        'status': job['status'],
+        'progress': 100 if job['status'] == 'complete' else None,
+        'files_scanned': get_cleaner().files_scanned,
+        'message': messages[job['status']]
+    })
 
 
 @app.route('/api/v1/scan/results/<scan_id>', methods=['GET'])
 def scan_results(scan_id):
     """Get scan results"""
-    try:
-        cleaner_obj = get_cleaner()
-        
-        if not cleaner_obj.scan_results:
-            raise ValueError("No scan results available")
-        
-        results = cleaner_obj.scan_results
-        
-        response_data = {
-            'total_used_gb': results.total_used / (1024**3),
-            'total_space_gb': results.total_space / (1024**3),
-            'utilization_percent': (results.total_used / results.total_space * 100) if results.total_space > 0 else 0,
-            'categories': {k: v / (1024**3) for k, v in results.categories.items()},
-            'large_files_count': len(results.large_files),
-            'duplicate_groups': len(results.duplicates),
-            'temp_files_count': len(results.temp_files),
-            'cleanable_gb': results.cleanable_size / (1024**3)
-        }
-        
-        return jsonify(response_data)
+    if scan_id != latest_scan_id:
+        return jsonify({'error': 'Results are only kept for the latest completed scan'}), 404
     
-    except Exception as e:
-        return jsonify({'error': str(e)}), 404
+    results = get_cleaner().scan_results
+    return jsonify({
+        'drive': results.drive,
+        'total_used_gb': results.total_used / GB,
+        'total_space_gb': results.total_space / GB,
+        'utilization_percent': (results.total_used / results.total_space * 100) if results.total_space > 0 else 0,
+        'categories': {k: v / GB for k, v in results.categories.items()},
+        'files_scanned': results.files_scanned,
+        'large_files_count': len(results.large_files),
+        'large_files': [{'path': f.path, 'size_gb': f.size / GB, 'age_days': f.age_days}
+                        for f in results.large_files[:20]],
+        'duplicate_groups': len(results.duplicates),
+        'duplicate_gb': get_cleaner().duplicate_bytes() / GB,
+        'temp_files_count': len(results.temp_files),
+        'temp_gb': sum(f.size for f in results.temp_files) / GB,
+        'cleanable_gb': results.cleanable_size / GB
+    })
 
 
 @app.route('/api/v1/cleanup/run', methods=['POST'])
@@ -207,46 +257,47 @@ def cleanup_run():
     try:
         data = request.json or {}
         cleanup_type = data.get('type', 'smart')
+        dry_run = bool(data.get('dry_run', False))
         
         cleaner_obj = get_cleaner()
-        db = get_db()
+        if is_scan_running():
+            return jsonify({'error': 'Wait for the running scan to finish'}), 409
+        if not cleaner_obj.scan_results:
+            return jsonify({'error': 'Run a scan before cleaning up'}), 400
         
-        space_freed = 0
-        files_deleted = 0
-        
+        started = time.time()
         if cleanup_type == 'temp':
-            space_freed = cleaner_obj.cleanup_temp_files(dry_run=False)
-            files_deleted = len(cleaner_obj.get_temp_files_list())
+            result = cleaner_obj.cleanup_temp_files(dry_run=dry_run)
         elif cleanup_type == 'duplicates':
-            space_freed = cleaner_obj.cleanup_duplicates(dry_run=False)
+            result = cleaner_obj.cleanup_duplicates(dry_run=dry_run)
         elif cleanup_type == 'large':
-            min_size = data.get('min_size_gb', 1)
-            space_freed = cleaner_obj.cleanup_large_files(min_size_gb=min_size)
+            min_size = float(data.get('min_size_gb', 1))
+            result = cleaner_obj.cleanup_large_files(min_size_gb=min_size, dry_run=dry_run)
         elif cleanup_type == 'smart':
-            space_freed = cleaner_obj.smart_cleanup()
+            result = cleaner_obj.smart_cleanup(dry_run=dry_run)
         else:
             return jsonify({'error': f'Unknown cleanup type: {cleanup_type}'}), 400
         
-        freed_mb = space_freed / (1024**2)
-        
-        # Record in database
         cleanup_id = str(uuid.uuid4())
-        db.record_cleanup({
-            'cleanup_id': cleanup_id,
-            'scan_id': None,  # Would link to actual scan ID if available
-            'cleanup_type': cleanup_type,
-            'files_deleted': files_deleted,
-            'space_freed_bytes': space_freed,
-            'duration_seconds': None,
-            'success': True
-        })
+        if not dry_run:
+            get_db().record_cleanup({
+                'cleanup_id': cleanup_id,
+                'scan_id': latest_scan_id,
+                'cleanup_type': cleanup_type,
+                'files_deleted': result.files_deleted,
+                'space_freed_bytes': result.freed_bytes,
+                'duration_seconds': time.time() - started,
+                'success': not result.errors,
+                'error_message': f'{len(result.errors)} files could not be removed' if result.errors else None
+            })
         
         return jsonify({
-            'status': 'success',
+            'status': 'preview' if dry_run else 'success',
             'cleanup_type': cleanup_type,
-            'space_freed_mb': freed_mb,
-            'space_freed_bytes': space_freed,
-            'files_deleted': files_deleted,
+            'space_freed_mb': result.freed_bytes / (1024**2),
+            'space_freed_bytes': result.freed_bytes,
+            'files_deleted': result.files_deleted,
+            'errors': result.errors[:20],
             'cleanup_id': cleanup_id,
             'timestamp': datetime.now().isoformat()
         })
@@ -261,7 +312,7 @@ def cleanup_run():
 def usage_stats():
     """Get current disk usage statistics"""
     try:
-        stats = psutil.disk_usage('/')
+        stats = psutil.disk_usage(os.path.abspath(os.sep))
         
         return jsonify({
             'total_bytes': stats.total,
@@ -303,6 +354,8 @@ def schedule_create():
             'name': data.get('name')
         })
     
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -446,28 +499,11 @@ def cloud_stats():
 def analytics_trends():
     """Get historical usage trends"""
     try:
-        db = get_db()
         days = request.args.get('days', 90, type=int)
         
-        # Try to get cached trends first
-        cached = db.get_cached_trends(max_age_hours=24)
-        if cached:
-            return jsonify({
-                'days_analyzed': days,
-                'daily_growth_mb': cached['daily_growth_mb'],
-                'weekly_growth_mb': cached['weekly_growth_mb'],
-                'monthly_growth_mb': cached['monthly_growth_mb'],
-                'trend_direction': 'stable',
-                'average_utilization': cached['average_utilization'],
-                'prediction_next_30_days_mb': cached['prediction_next_30_days_mb'],
-                'data_points': 0  # From cache
-            })
-        
-        # Calculate fresh trends
-        trends = db.calculate_trends(days=days)
-        
-        # Cache results
-        db.cache_trends(trends)
+        # Computing over the scans table is cheap; a day-old cache would hide new scans
+        trends = get_db().calculate_trends(days=days)
+        trends['days_analyzed'] = days
         
         return jsonify(trends)
     
@@ -548,17 +584,14 @@ def analytics_statistics():
 def export_report():
     """Export scan report as JSON"""
     try:
-        cleaner_obj = get_cleaner()
+        report = get_cleaner().build_report()
+        if report is None:
+            return jsonify({'error': 'No scan results available'}), 404
         
-        filename = cleaner_obj.export_report()
-        
-        # Send file for download
-        return send_file(
-            filename,
-            as_attachment=True,
-            mimetype='application/json',
-            download_name=f'report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json'
-        )
+        response = jsonify(report)
+        filename = f'report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json'
+        response.headers['Content-Disposition'] = f'attachment; filename={filename}'
+        return response
     
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -617,11 +650,11 @@ def main():
     port = int(os.getenv('PORT', 5000))
     debug = os.getenv('DEBUG', 'false').lower() == 'true'
     
-    print(f"Starting EatUp Pro API Server on port {port}")
-    print(f"Documentation: http://localhost:{port}/docs")
+    print(f"Starting EatUp Pro API Server on {HOST}:{port}")
+    print(f"App: http://localhost:{port}/app.html")
     print(f"Health check: http://localhost:{port}/api/v1/health")
     
-    app.run(host='0.0.0.0', port=port, debug=debug)
+    app.run(host=HOST, port=port, debug=debug)
 
 
 if __name__ == '__main__':
