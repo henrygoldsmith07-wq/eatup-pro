@@ -1,0 +1,107 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation (not needed in container)
+docs/
+*.md
+!README.md
+
+# Development files
+tests/
+test/
+*test*.py
+pytest.ini
+.coverage
+htmlcov/
+.pytest_cache/
+
+# IDE and editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+
+# Application data (will be mounted as volumes)
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment files
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+secrets/
+
+# Logs
+logs/
+*.log
+
+# Jupyter notebooks
+.ipynb_checkpoints/
+*.ipynb
+
+# Linters
+.mypy_cache/
+.ruff_cache/
+
+# Build artifacts
+*.so
+*.a
+*.o
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Test coverage
+.coverage
+coverage.xml
+htmlcov/
+
+# Qcoder-specific
+.memory/
+.qcoder/
+
+# Misc
+*~
+.nvmrc
+.gitlab-ci.yml
+.dockerignore
+DEPLOYMENT.md
+ARCHITECTURE.md

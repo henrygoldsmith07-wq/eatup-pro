@@ -1,0 +1,198 @@
+# EatUp Pro v8.0 - Prometheus Alert Rules
+# Production-ready monitoring with intelligent alerting thresholds
+
+groups:
+  - name: eatup_critical_alerts
+    interval: 30s
+    rules:
+      # API Health Alerts
+      - alert: EatUpAPIUnavailable
+        expr: eatup_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "EatUp Pro API is down"
+          description: "The EatUp Pro API has been unavailable for more than 1 minute on instance {{ $labels.instance }}"
+          runbook_url: "https://github.com/eatup-pro/monitoring/wiki/API-Down"
+      
+      - alert: HighErrorRate
+        expr: |
+          rate(http_requests_total{status=~"5.."}[5m]) 
+          / sum(rate(http_requests_total[5m])) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "High HTTP error rate detected"
+          description: "{{ $value | humanizePercentage }} error rate on {{ $labels.service }} - expected < 5%"
+          runbook_url: "https://github.com/eatup-pro/monitoring/wiki/ErrorRate"
+      
+      - alert: HighRequestLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2.0
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "P95 request latency exceeding threshold"
+          description: "P95 latency is {{ $value | humanize }}s on {{ $labels.service }}"
+          runbook_url: "https://github.com/eatup-pro/monitoring/wiki/Latency"
+
+      # Storage Management Alerts
+      - alert: DriveFillingUpFast
+        expr: |
+          (disk_usage_bytes / disk_capacity_bytes) * 100 
+          > 90 AND
+          increase(disk_usage_bytes[1h]) > 5368709120  # 5GB per hour
+        for: 5m
+        labels:
+          severity: critical
+          team: operations
+        annotations:
+          summary: "Drive filling up extremely fast!"
+          description: "Disk usage at {{ $value | humanizePercentage }} on {{ $labels.instance }} - gaining {{ $value | humanize }}/hour"
+          runbook_url: "https://github.com/eatup-pro/monitoring/wiki/FastFilling"
+
+      - alert: AIRecommendationsFailing
+        expr: eatup_ai_recommendation_errors_total > 10
+        for: 10m
+        labels:
+          severity: warning
+          team: ai-team
+        annotations:
+          summary: "Neural AI recommendations experiencing failures"
+          description: "{{ $value }} AI recommendation errors in last 10 minutes"
+          runbook_url: "https://github.com/eatup-pro/monitoring/wiki/AIFailures"
+
+  - name: eatup_system_alerts
+    interval: 1m
+    rules:
+      # Resource Utilization
+      - alert: HighCPUUsage
+        expr: |
+          (cpu_usage_seconds_total / cpu_total_seconds_total) * 100 
+          > 80
+        for: 10m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage at {{ $value | humanizePercentage }} on {{ $labels.pod }}"
+      
+      - alert: MemoryPressure
+        expr: |
+          (memory_used_bytes / memory_total_bytes) * 100 
+          > 85
+        for: 5m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "Memory pressure detected"
+          description: "Memory usage at {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+      
+      - alert: LowDiskSpace
+        expr: |
+          ((disk_capacity_bytes - disk_available_bytes) / disk_capacity_bytes) * 100 
+          > 85
+        for: 15m
+        labels:
+          severity: warning
+          team: operations
+        annotations:
+          summary: "Low disk space"
+          description: "Disk {{ $labels.device }} at {{ $value | humanizePercentage }} used"
+
+      # Cache Performance
+      - alert: RedisMemoryHigh
+        expr: redis_memory_used_bytes / redis_maxmemory_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Redis memory usage high"
+          description: "Redis memory at {{ $value | humanizePercentage }}"
+      
+      - alert: HighDatabaseConnections
+        expr: postgres_connections_active > 100
+        for: 5m
+        labels:
+          severity: warning
+          team: database
+        annotations:
+          summary: "PostgreSQL connection pool nearly exhausted"
+          description: "{{ $value }} active connections, max pool size typically 100"
+
+  - name: eatup_business_alerts
+    interval: 5m
+    rules:
+      # Business Metrics
+      - alert: ScanFailureRateHigh
+        expr: |
+          rate(scan_failed_total[1h]) / rate(scan_completed_total[1h]) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Scan failure rate increasing"
+          description: "10% of scans are failing - currently {{ $value | humanizePercentage }}"
+      
+      - alert: CleanupJobQueueFull
+        expr: cleanup_job_queue_size > 50
+        for: 15m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Cleanup job queue backing up"
+          description: "{{ $value }} jobs queued, processing may be delayed"
+      
+      - alert: AIModelAccuracyDrop
+        expr: eatup_ai_accuracy_ratio < 0.8
+        for: 30m
+        labels:
+          severity: warning
+          team: ai-team
+        annotations:
+          summary: "AI model accuracy dropping"
+          description: "Current accuracy {{ $value | humanizePercentage }} - below 80% threshold"
+      
+      - alert: BlockchainLedgerBehind
+        expr: blockchain_latest_block_timestamp < time() - 3600
+        for: 15m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "Blockchain audit ledger not updating"
+          description: "Last block timestamp is stale - check blockchain integration"
+
+  - name: eatup_infrastructure_alerts
+    interval: 1m
+    rules:
+      # Docker/Kubernetes metrics if applicable
+      - alert: ContainerRestartLoop
+        expr: rate(container_restart_total[10m]) > 2
+        for: 5m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "Container restart loop detected"
+          description: "{{ $labels.container }} restarting frequently - {{ $value }} restarts/10min"
+      
+      - alert: DatabaseReplicationLag
+        expr: postgres_replication_lag_seconds > 300
+        for: 5m
+        labels:
+          severity: warning
+          team: database
+        annotations:
+          summary: "Database replication lagging"
+          description: "Replication lag of {{ $value }} seconds exceeds 5 minute threshold"

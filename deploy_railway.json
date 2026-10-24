@@ -1,0 +1,27 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "NIXBUILDKIT",
+    "nixpkgsArchive": "stable"
+  },
+  "deploy": {
+    "startCommand": "python api_server.py",
+    "restartOnDeploy": true,
+    "healthcheckPath": "/api/v1/health",
+    "healthcheckTimeout": 300,
+    "replicas": 1,
+    "updateStrategy": "rolling"
+  },
+  "env": {
+    "PYTHON_VERSION": "3.11",
+    "PORT": "8000",
+    "FLASK_ENV": "production",
+    "DATABASE_URL": "sqlite:///data/eatup_storage.db",
+    "LOG_LEVEL": "INFO",
+    "ENABLE_NEURAL_AI": "true",
+    "ENABLE_QUANTUM_OPTIMIZATION": "true",
+    "ENABLE_BLOCKCHAIN_AUDIT": "true",
+    "API_RATE_LIMIT": "1000",
+    "SESSION_TIMEOUT_MINUTES": "60"
+  }
+}

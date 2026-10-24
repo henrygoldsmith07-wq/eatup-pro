@@ -1,0 +1,70 @@
+# EatUp Pro v8.0 - Grafana Dashboard Provisioning
+# Pre-configured dashboards for comprehensive observability
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      timeInterval: "15s"
+      queryTimeout: "60s"
+      httpMethod: POST
+  
+  - name: PostgreSQL
+    type: postgres
+    access: proxy
+    url: postgres
+    database: eatup_pro
+    user: eatup_user
+    jsonData:
+      maxOpenConns: 20
+      maxIdleConns: 5
+      connMaxLifetime: 14400
+
+  - name: Elasticsearch
+    type: elasticsearch
+    url: http://elasticsearch:9200
+    editable: true
+    jsonData:
+      timeField: "@timestamp"
+      esVersion: "7.10.0"
+      interval: "auto"
+
+dashboards:
+  - name: "EatUp Pro Overview"
+    path: "/etc/grafana/provisioning/dashboards/eatup-overview.json"
+    folder: "EatUp Pro"
+    uid: "eatup-overview-001"
+    
+  - name: "Storage Analytics"
+    path: "/etc/grafana/provisioning/dashboards/storage-analytics.json"
+    folder: "EatUp Pro"
+    uid: "storage-analytics-001"
+    
+  - name: "AI & Quantum Metrics"
+    path: "/etc/grafana/provisioning/dashboards/ai-quantum-metrics.json"
+    folder: "EatUp Pro"
+    uid: "ai-quantum-001"
+    
+  - name: "System Performance"
+    path: "/etc/grafana/provisioning/dashboards/system-performance.json"
+    folder: "EatUp Pro"
+    uid: "system-performance-001"
+    
+  - name: "Blockchain Audit Trail"
+    path: "/etc/grafana/provisioning/dashboards/blockchain-audit.json"
+    folder: "EatUp Pro"
+    uid: "blockchain-audit-001"
+
+dashboardProviders:
+  - name: 'eatup-providers'
+    disableDeletion: false
+    editoRole: Editor
+    foldersHome: /etc/grafana/provisioning/dashboards
+    options:
+      path: /etc/grafana/provisioning/dashboards

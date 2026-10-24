@@ -1,0 +1,131 @@
+# EatUp Pro v8.0 - Prometheus Monitoring Configuration
+# Full observability with metrics scraping, alerting, and dashboards
+
+global:
+  scrape_interval: 15s      # Default scrape interval
+  evaluation_interval: 15s   # Alert evaluation interval
+  external_labels:
+    monitor: 'eatup-pro-monitor'
+    environment: 'production'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+          labels:
+            severity: 'critical'
+
+# Rule files for alerts and recordings
+rule_files:
+  - "alerts/*.yml"
+  - "rules/*.yml"
+
+# Scrape configurations
+scrape_configs:
+  # Self-monitoring of EatUp API
+  - job_name: 'eatup-api'
+    static_configs:
+      - targets: ['eatup-api:5000']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    scrape_timeout: 5s
+    scheme: http
+    
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        regex: '(.+):(.+)'
+        replacement: '${1}:${2}'
+      
+      # Add service label
+      - source_labels: [__meta_service_name]
+        target_label: service
+        replacement: 'eatup-pro-api'
+
+  # PostgreSQL Database monitoring
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres:5432']
+    
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: db_instance
+        replacement: 'eatup-postgres'
+
+  # Redis Cache monitoring
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+    
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: cache_type
+        replacement: 'main-cache'
+
+  # Nginx reverse proxy monitoring
+  - job_name: 'nginx'
+    static_configs:
+      - targets: ['nginx:80']
+    
+    metrics_path: /nginx_status
+    params:
+      mode: status
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: proxy_type
+        replacement: 'main-proxy'
+
+  # Node exporter (system metrics)
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: hostname
+        regex: '(.+)'
+        replacement: '${1}'
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+# Recording rules for pre-computed metrics
+groups:
+  - name: storage_metrics
+    interval: 30s
+    rules:
+      # Disk usage rate calculations
+      - record: eatup:disk_usage_bytes:rate5m
+        expr: rate(disk_usage_bytes[5m])
+      
+      - record: eatup:cleanup_rate_jobs:rate1h
+        expr: sum(rate(cleanup_jobs_total[1h])) by (status)
+      
+      - record: eatup:space_saved:rate24h
+        expr: sum(rate(space_saved_bytes[24h])) by (category)
+      
+      # AI recommendation accuracy
+      - record: eatup:ai_recommendations_accuracy:ratio
+        expr: eatup:ai_accepted : eatup:ai_total
+      
+      # Quantum optimization efficiency
+      - record: eatup:quantum_convergence_time_seconds:avg
+        expr: avg(quantum_optimization_duration_seconds)
+        
+  - name: system_health
+    rules:
+      # Aggregate availability
+      - record: eatup:availability_ratio:ratio
+        expr: avg(eatup_up > 0.95)
+      
+      # Error rates across all services
+      - record: eatup:error_rate:ratio
+        expr: sum(rate(http_requests_total{status=~"5.."}[5m])) by (service) 
+              / sum(rate(http_requests_total[5m])) by (service)
+      
+      # P99 latency
+      - record: eatup:http_request_duration_p99:histogram_quantile
+        expr: histogram_quantile(0.99, rate(http_request_duration_seconds_bucket[5m]))
