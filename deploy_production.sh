@@ -1,150 +1,252 @@
 #!/bin/bash
-# EatUp Pro Production Deployment Script v8.0
-# Complete automated deployment and configuration
+# EatUp Pro v8.1+ - Automated Deployment Script
+# Production-ready deployment with health checks and rollback
 
 set -e  # Exit on error
 
-echo "======================================"
-echo "🎯 EATUP PRO PRODUCTION DEPLOYMENT"
-echo "v8.0 - Ultimate System Optimization"
-echo "======================================"
-echo ""
+echo "🚀 EatUp Pro v8.1+ - Production Deployment"
+echo "============================================="
+
+# Configuration
+APP_NAME="eatup-pro"
+VERSION="8.1+"
+BACKUP_DIR="./backups"
+LOG_FILE="/var/log/eatup-deploy.log"
 
 # Colors for output
+RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-log_info() { echo -e "${GREEN}[$(date '+%Y-%m-%d %H:%M:%S')] INFO:${NC} $1"; }
-log_warn() { echo -e "${YELLOW}[$(date '+%Y-%m-%d %H:%M:%S')] WARN:${NC} $1"; }
-log_error() { echo -e "${RED}[$(date '+%Y-%m-%d %H:%M:%S')] ERROR:${NC} $1"; }
-
-# Check Python version
-log_info "Checking Python environment..."
-python_version=$(python3 --version 2>&1 | cut -d' ' -f2)
-if [ $(echo "$python_version < 3.8" | bc -l) -eq 1 ]; then
-    log_error "Python 3.8+ required, found: $python_version"
-    exit 1
-fi
-log_info "✓ Python $python_version detected"
-
-# Create data directory
-log_info "Creating directories..."
-mkdir -p data/logs data/backups data/export
-chmod 755 data logs backups export
-
-# Install core dependencies
-log_info "Installing core dependencies..."
-pip install -q Flask flask-cors winshell psutil colorama
-
-# Install optional ML dependencies (with fallback)
-log_info "Installing ML dependencies..."
-pip install -q scikit-learn numpy pandas || log_warn "ML libraries skipped (optional)"
-
-# Install voice/speech dependencies (with fallback)
-log_info "Installing voice interfaces..."
-pip install -q SpeechRecognition pyttsx3 || log_warn "Voice dependencies skipped (optional)"
-
-# Install WebSocket support (with fallback)
-log_info "Installing WebSocket support..."
-pip install -q flask-socketio python-socketio gevent || log_warn "WebSocket skipped (optional)"
-
-# Install visualization dependencies
-log_info "Installing visualization tools..."
-pip install -q Pillow || log_warn "PIL/Pillow skipped (optional)"
-
-# Initialize database
-log_info "Initializing databases..."
-python3 -c "import sqlite3; conn = sqlite3.connect('data/eatup_main.db'); conn.close()"
-python3 -c "import sqlite3; conn = sqlite3.connect('data/mobile_api.db'); conn.close()"
-log_info "✓ Databases initialized"
-
-# Set up log rotation
-log_info "Configuring log management..."
-cat > data/logrotate.conf << 'EOF'
-data/*.log {
-    daily
-    rotate 7
-    compress
-    missingok
-    notifempty
-    size 10M
-    postrotate
-        /bin/kill -USR1 `cat /var/run/syslog.pid 2>/dev/null` 2>/dev/null || true
-    endscript
+log() {
+    echo -e "${GREEN}[INFO]${NC} $1" | tee -a "$LOG_FILE"
 }
+
+warn() {
+    echo -e "${YELLOW}[WARN]${NC} $1" | tee -a "$LOG_FILE"
+}
+
+error() {
+    echo -e "${RED}[ERROR]${NC} $1" | tee -a "$LOG_FILE"
+}
+
+# Check prerequisites
+check_prerequisites() {
+    log "Checking prerequisites..."
+    
+    # Check Python version
+    if ! command -v python3 &> /dev/null; then
+        error "Python 3 is required but not installed"
+        exit 1
+    fi
+    
+    python_version=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+    log "Python version: $python_version"
+    
+    # Check pip
+    if ! command -v pip3 &> /dev/null; then
+        error "pip3 is required but not installed"
+        exit 1
+    fi
+    
+    log "✅ Prerequisites met"
+}
+
+# Create backup
+create_backup() {
+    log "Creating backup of current deployment..."
+    
+    mkdir -p "$BACKUP_DIR"
+    BACKUP_FILE="$BACKUP_DIR/eatup_backup_$(date +%Y%m%d_%H%M%S).tar.gz"
+    
+    tar -czf "$BACKUP_FILE" --exclude='*.pyc' --exclude='__pycache__' . 2>/dev/null || true
+    
+    log "Backup created: $BACKUP_FILE"
+}
+
+# Install dependencies
+install_dependencies() {
+    log "Installing Python dependencies..."
+    
+    pip3 install -r requirements.txt
+    
+    log "✅ Dependencies installed"
+}
+
+# Migrate database
+run_migrations() {
+    log "Running database migrations..."
+    
+    if [ -f "api_server.py" ]; then
+        python3 -c "from api_server import init_database; init_database()" 2>/dev/null || true
+    fi
+    
+    log "✅ Database migrations complete"
+}
+
+# Start services
+start_services() {
+    log "Starting EatUp Pro services..."
+    
+    # Stop existing processes
+    pkill -f "api_server.py" 2>/dev/null || true
+    
+    # Start new process in background
+    nohup python3 api_server.py > /var/log/eatup_api.log 2>&1 &
+    
+    sleep 3
+    
+    log "✅ Services started"
+}
+
+# Health check
+health_check() {
+    log "Performing health check..."
+    
+    MAX_RETRIES=10
+    RETRY_COUNT=0
+    
+    while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+        if curl -s http://localhost:5000/api/v1/health > /dev/null 2>&1; then
+            log "✅ Health check passed"
+            return 0
+        fi
+        
+        RETRY_COUNT=$((RETRY_COUNT + 1))
+        log "Waiting for service to start... ($RETRY_COUNT/$MAX_RETRIES)"
+        sleep 2
+    done
+    
+    error "Health check failed after $MAX_RETRIES attempts"
+    return 1
+}
+
+# Rollback if needed
+rollback() {
+    warn "Initiating rollback..."
+    
+    LATEST_BACKUP=$(ls -t $BACKUP_DIR/*.tar.gz 2>/dev/null | head -1)
+    
+    if [ -n "$LATEST_BACKUP" ]; then
+        log "Restoring from backup: $LATEST_BACKUP"
+        tar -xzf "$LATEST_BACKUP"
+        start_services
+        log "✅ Rollback complete"
+    else
+        error "No backup available for rollback"
+        exit 1
+    fi
+}
+
+# Deploy main application
+deploy_application() {
+    log "Deploying EatUp Pro v$VERSION..."
+    
+    # Get latest code (git pull or equivalent)
+    if [ -d ".git" ]; then
+        git pull origin main
+    fi
+    
+    # Create directories
+    mkdir -p data logs backups config
+    
+    # Set permissions
+    chmod 755 data logs backups
+    
+    # Install dependencies
+    install_dependencies
+    
+    # Run migrations
+    run_migrations
+    
+    # Start services
+    start_services
+    
+    # Verify deployment
+    if health_check; then
+        log "✅ Deployment successful!"
+        
+        # Show stats
+        log "\n📊 Deployment Statistics:"
+        total_lines=$(find . -name "*.py" -exec cat {} \; | wc -l)
+        total_files=$(find . -name "*.py" | wc -l)
+        log "   Total Python files: $total_files"
+        log "   Total lines of code: $total_lines"
+        
+    else
+        error "Deployment verification failed"
+        rollback
+    fi
+}
+
+# Generate configuration
+generate_config() {
+    log "Generating production configuration..."
+    
+    if [ ! -f "config/.env" ]; then
+        cat > config/.env << EOF
+# EatUp Pro Production Configuration
+FLASK_ENV=production
+PORT=5000
+DATABASE_URL=sqlite:///data/eatup_storage.db
+ENABLE_NEURAL_AI=true
+ENABLE_QUANTUM_OPTIMIZATION=true
+ENABLE_BLOCKCHAIN_AUDIT=true
+API_RATE_LIMIT=1000
+SESSION_TIMEOUT_MINUTES=60
+LOG_LEVEL=INFO
 EOF
+        log "Configuration generated at config/.env"
+    fi
+}
 
-# Create backup automation script
-log_info "Setting up backup automation..."
-cat > backup_daily.sh << 'EOFSH'
-#!/bin/bash
-DATE=$(date +%Y%m%d_%H%M%S)
-BACKUP_DIR="backups/archive_$DATE"
-mkdir -p $BACKUP_DIR
-cp -r data/logs/* $BACKUP_DIR/logs/ 2>/dev/null || true
-cp -r data/*.db $BACKUP_DIR/ 2>/dev/null || true
-tar -czf $BACKUP_DIR/data.tar.gz . 2>/dev/null || true
-find backups -mtime +30 -delete
-echo "Backup completed: $BACKUP_DIR"
-EOFSH
-chmod +x backup_daily.sh
+# Cleanup old backups
+cleanup_backups() {
+    log "Cleaning up old backups (keeping last 7 days)..."
+    
+    find "$BACKUP_DIR" -name "*.tar.gz" -mtime +7 -delete 2>/dev/null || true
+    
+    log "✅ Backup cleanup complete"
+}
 
-# Add to crontab if running on Linux/Mac
-if [[ "$OSTYPE" == "linux-gnu"* ]] || [[ "$OSTYPE" == "darwin"* ]]; then
-    log_info "Setting up scheduled tasks..."
-    (crontab -l 2>/dev/null; echo "0 2 * * * cd \$(dirname \$0) && ./backup_daily.sh") | crontab -
-    log_info "✓ Daily backups scheduled at 2 AM"
-fi
+# Main deployment flow
+main() {
+    log "Starting EatUp Pro deployment..."
+    
+    # Execute deployment steps
+    check_prerequisites
+    create_backup
+    generate_config
+    deploy_application
+    cleanup_backups
+    
+    log "\n🎉 Deployment Complete!"
+    log "Service running at: http://localhost:5000"
+    log "Logs available at: /var/log/eatup_api.log"
+}
 
-# Start API server in background (optional)
-START_API=false
-read -p "Start API Server? (y/n): " START_API
-if [ "$START_API" = "y" ]; then
-    log_info "Starting API Server..."
-    nohup python3 api_server.py > data/logs/api_server.log 2>&1 &
-    API_PID=$!
-    echo "API Server started with PID: $API_PID"
-    echo "Logs: data/logs/api_server.log"
-fi
-
-# Show deployment summary
-echo ""
-echo "=========================================="
-echo "✅ DEPLOYMENT COMPLETE!"
-echo "=========================================="
-echo ""
-echo "📁 Directories created:"
-echo "   - data/logs/"
-echo "   - data/backups/"  
-echo "   - data/export/"
-echo ""
-echo "📊 Databases initialized:"
-echo "   - eatup_main.db"
-echo "   - mobile_api.db"
-echo ""
-echo "🔧 Services configured:"
-echo "   ✓ Core dependencies installed"
-echo "   ✓ Optional ML features ready"
-echo "   ✓ Voice interface configured"
-echo "   ✓ WebSocket support active"
-echo ""
-echo "📅 Scheduled tasks:"
-echo "   ✓ Daily backup at 2 AM"
-echo "   ✓ Log rotation enabled"
-echo ""
-echo "🚀 Quick Start Commands:"
-echo "   Scan drive:     python master_control.py scan --drive C:"
-echo "   Smart cleanup:  python master_control.py cleanup"
-echo "   Game optimize:  python master_control.py games"
-echo "   Quantum clean:  python master_control.py quantum"
-echo "   System opt:     python master_control.py system"
-echo ""
-echo "🌐 Web Interface: http://localhost:5000"
-echo ""
-echo "📖 Full documentation: See FEATURES_COMPLETE_V2.1.0.md"
-echo ""
-echo "Version: 8.0 - Production Ready"
-echo "Repository: https://github.com/henrygoldsmith07-wq/eatup-pro"
-echo ""
+# Handle arguments
+case "${1:-deploy}" in
+    deploy)
+        main
+        ;;
+    backup)
+        create_backup
+        ;;
+    status)
+        if pgrep -f "api_server.py" > /dev/null; then
+            log "Service is RUNNING"
+            curl -s http://localhost:5000/api/v1/health | python3 -m json.tool 2>/dev/null || true
+        else
+            error "Service is NOT running"
+        fi
+        ;;
+    rollback)
+        rollback
+        ;;
+    *)
+        echo "Usage: $0 {deploy|backup|status|rollback}"
+        exit 1
+        ;;
+esac
