@@ -2,7 +2,7 @@
   "name": "eatup-pro-desktop",
   "version": "1.0.0",
   "description": "EatUp Pro - Desktop Disk Cleanup Application",
-  "main": "electron/main.js",
+  "main": "main.js",
   "scripts": {
     "start": "electron .",
     "build": "electron-builder",

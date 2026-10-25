@@ -9,7 +9,7 @@ import sys
 import importlib.util
 from pathlib import Path
 from typing import List, Dict, Any
-from base_plugin import BasePlugin, PluginRegistry
+from .base_plugin import BasePlugin, PluginRegistry
 
 
 class PluginManager:

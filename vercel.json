@@ -3,29 +3,14 @@
   "name": "eatup-pro",
   "builds": [
     {
-      "src": "index.html",
+      "src": "*.html",
       "use": "@vercel/static"
     },
     {
-      "src": "api/**/*.py",
-      "use": "@vercel/python"
+      "src": "i18n/*.json",
+      "use": "@vercel/static"
     }
   ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "index.html"
-    },
-    {
-      "src": "/api/v1/(.*)",
-      "dest": "/api/v1/$1"
-    }
-  ],
-  "env": {
-    "PORT": "8080",
-    "DEBUG": "false",
-    "API_KEY": "@api_key"
-  },
   "headers": [
     {
       "source": "/assets/(.*)",
