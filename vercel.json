@@ -6,14 +6,14 @@
       "use": "@vercel/static"
     },
     {
-      "src": "api_server.py",
+      "src": "api/*.py",
       "use": "@vercel/python"
     }
   ],
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/api_server.py"
+      "dest": "/api/$1"
     },
     {
       "src": "/(.*)",
@@ -21,9 +21,27 @@
     }
   ],
   "env": {
-    "PORT": "5000"
+    "FLASK_ENV": "production",
+    "PORT": "8080",
+    "DATABASE_URL": "sqlite:///data/eatup_storage.db"
   },
-  "github": {
-    "silent": true
-  }
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, POST, PUT, DELETE, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type, Authorization"
+        }
+      ]
+    }
+  ]
 }

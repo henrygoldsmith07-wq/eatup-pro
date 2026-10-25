@@ -1,0 +1,18 @@
+# EatUp Pro - Custom Build Configuration for Vercel
+
+# This file helps Vercel understand how to build and deploy your Python app
+
+[build]
+  command = "pip install -r requirements.txt"
+  
+[files]
+  directories = [
+    "api",
+    "data",
+    "plugins"
+  ]
+
+# Environment variables for build
+[build.env]
+  PYTHON_VERSION = "3.11"
+  PIP_INSTALL_FLAGS = "--no-cache-dir"
