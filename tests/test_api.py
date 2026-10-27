@@ -104,12 +104,21 @@ def test_export_and_analytics(client):
 
 def test_trends_cache_hit(tmp_path):
     db = AnalyticsDatabase(tmp_path / "cache.db")
-    assert db.get_cached_trends() is None
-    db.cache_trends({"daily_growth_mb": 1.5, "weekly_growth_mb": 10.5,
-                     "monthly_growth_mb": 45.0, "average_utilization": 62.0,
-                     "prediction_next_30_days_mb": 45.0})
-    cached = db.get_cached_trends(max_age_hours=24)
-    assert cached is not None  # A fresh row must be returned, not always None
-    assert cached["daily_growth_mb"] == 1.5
-    assert db.get_cached_trends(max_age_hours=0) is None
-    db.close()
+    try:
+        assert db.get_cached_trends() is None
+        # Freshness is per-day (DATE column): a row cached the previous day
+        # must not be returned
+        db.conn.execute("INSERT INTO trends_cache (calculation_date, daily_growth_mb)"
+                        " VALUES (date('now', '-1 day'), 9.0)")
+        db.conn.commit()
+        assert db.get_cached_trends(max_age_hours=12) is None
+        # A row cached today must be returned. Regression: the old query compared
+        # the DATE column against datetime(), so it could never match anything.
+        db.cache_trends({"daily_growth_mb": 1.5, "weekly_growth_mb": 10.5,
+                         "monthly_growth_mb": 45.0, "average_utilization": 62.0,
+                         "prediction_next_30_days_mb": 45.0})
+        cached = db.get_cached_trends(max_age_hours=12)
+        assert cached is not None
+        assert cached["daily_growth_mb"] == 1.5
+    finally:
+        db.close()
