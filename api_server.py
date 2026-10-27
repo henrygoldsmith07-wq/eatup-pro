@@ -654,7 +654,13 @@ def internal_error(error):
 
 def main():
     """Start the API server"""
-    port = int(os.getenv('PORT', 5000))
+    import argparse
+
+    parser = argparse.ArgumentParser(description='EatUp Pro API server')
+    parser.add_argument('--port', type=int, default=int(os.getenv('PORT', 5000)),
+                        help='Port to listen on (default: $PORT or 5000)')
+    args = parser.parse_args()
+    port = args.port
     debug = os.getenv('DEBUG', 'false').lower() == 'true'
     
     print(f"Starting EatUp Pro API Server on {HOST}:{port}")
