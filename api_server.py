@@ -152,6 +152,8 @@ def scan_start():
     """Start a new drive scan in the background"""
     data = request.json or {}
     drive = data.get('drive', 'C:')
+    if not isinstance(drive, str) or not drive.strip():
+        return jsonify({'error': 'drive must be a non-empty string'}), 400
     with_duplicates = data.get('find_duplicates', True)
     
     with scan_lock:
@@ -271,7 +273,12 @@ def cleanup_run():
         elif cleanup_type == 'duplicates':
             result = cleaner_obj.cleanup_duplicates(dry_run=dry_run)
         elif cleanup_type == 'large':
-            min_size = float(data.get('min_size_gb', 1))
+            try:
+                min_size = float(data.get('min_size_gb', 1))
+            except (TypeError, ValueError):
+                return jsonify({'error': 'min_size_gb must be a number'}), 400
+            if min_size <= 0:
+                return jsonify({'error': 'min_size_gb must be positive'}), 400
             result = cleaner_obj.cleanup_large_files(min_size_gb=min_size, dry_run=dry_run)
         elif cleanup_type == 'smart':
             result = cleaner_obj.smart_cleanup(dry_run=dry_run)
