@@ -398,11 +398,13 @@ class AnalyticsDatabase:
     def get_cached_trends(self, max_age_hours: int = 24) -> Optional[Dict]:
         """Get cached trends if still fresh"""
         cursor = self.conn.cursor()
+        # calculation_date is a DATE ('YYYY-MM-DD'); compare it against date(),
+        # not datetime(): '2026-10-27' can never exceed '2026-10-27 12:00:00'
         cutoff = datetime.now().timestamp() - (max_age_hours * 3600)
-        
+
         cursor.execute('''
             SELECT * FROM trends_cache
-            WHERE calculation_date > datetime(?, 'unixepoch')
+            WHERE calculation_date >= date(?, 'unixepoch')
             ORDER BY id DESC
             LIMIT 1
         ''', (cutoff,))
