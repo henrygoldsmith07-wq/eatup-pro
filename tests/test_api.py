@@ -66,7 +66,8 @@ def test_cleanup_requires_scan_and_json(client):
 def test_scan_start_rejects_invalid_drive(client):
     assert client.post("/api/v1/scan/start", json={"drive": 7}).status_code == 400
     assert client.post("/api/v1/scan/start", json={"drive": "  "}).status_code == 400
-    assert client.post("/api/v1/scan/start", json={"drive": client.scan_root}).status_code == 200
+    scan_id = client.post("/api/v1/scan/start", json={"drive": client.scan_root}).get_json()["scan_id"]
+    assert wait_for_scan(client, scan_id)["status"] == "complete"
 
 
 def test_cleanup_rejects_bad_min_size(client):
