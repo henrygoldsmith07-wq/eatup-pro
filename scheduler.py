@@ -450,7 +450,7 @@ class SchedulerManager:
             f.write(task_xml)
         
         print(f"Created Task Scheduler XML: {task_xml_file}")
-        print("Import this into Task Scheduler or use: schtasks /create /tn \"EatUp {task_name}\" /xml \"{task_xml_file}\"")
+        print(f"Import this into Task Scheduler or use: schtasks /create /tn \"EatUp {task_name}\" /xml \"{task_xml_file}\"")
 
 
 def main():
@@ -483,7 +483,10 @@ def main():
             actions = input("Actions (comma-separated, default scan): ").strip() or "scan"
             actions = [a.strip() for a in actions.split(',')]
             
-            manager.add_task(name, drive, freq, time, actions)
+            try:
+                manager.add_task(name, drive, freq, time, actions)
+            except ValueError as e:
+                print(f"✗ Invalid task: {e}")
         
         elif choice == '2':
             runs = manager.get_next_scheduled_runs()

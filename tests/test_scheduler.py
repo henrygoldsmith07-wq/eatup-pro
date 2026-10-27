@@ -44,3 +44,14 @@ def test_add_task_validates_input(tmp_path):
         manager.add_task("x", frequency="hourly")
     with pytest.raises(ValueError):
         manager.add_task("x", actions=["rm_rf"])
+
+
+def test_create_windows_task_prints_filled_in_commands(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    SchedulerManager.create_windows_task("task_1", "Nightly")
+    out = capsys.readouterr().out
+    # The schtasks hint must contain real values, not literal {placeholders}
+    assert "Nightly" in out and "eatup_task_task_1.xml" in out
+    assert "{task_name}" not in out and "{task_xml_file}" not in out
+    xml = (tmp_path / "eatup_task_task_1.xml").read_text()
+    assert '--auto-run "task_1"' in xml
