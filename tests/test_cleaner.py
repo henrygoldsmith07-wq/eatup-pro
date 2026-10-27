@@ -125,3 +125,16 @@ def test_delete_errors_are_reported(tree, monkeypatch):
     c.scan_drive(str(tree))
     result = c.cleanup_temp_files()
     assert result.files_deleted == 0 and len(result.errors) == 1
+
+
+def test_cleanable_size_shrinks_after_cleanup(tree, monkeypatch):
+    monkeypatch.setattr(cleaner, "move_to_recycle_bin", lambda p: os.remove(p))
+    c = EatUpCleaner()
+    c.scan_drive(str(tree))
+    c.find_duplicates()
+    # 10 bytes of temp files + 12 bytes of duplicate copies
+    assert c.scan_results.cleanable_size == 22
+
+    c.smart_cleanup()
+    # Cleaned files must no longer be reported as reclaimable space
+    assert c.scan_results.cleanable_size == 0
