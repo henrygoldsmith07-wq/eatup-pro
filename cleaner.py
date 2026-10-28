@@ -145,15 +145,17 @@ class EatUpCleaner:
 
         large_files.sort(key=lambda f: f.size, reverse=True)
         temp_files.sort(key=lambda f: f.size, reverse=True)
+        retained_large_files = large_files[:100]
+        retained_temp_files = temp_files[:500]
 
         self.scan_results = ScanResult(
             total_used=usage.used,
             total_space=usage.total,
             categories=categories,
-            large_files=large_files[:100],  # Keep the 100 largest
+            large_files=retained_large_files,  # Keep the 100 largest
             duplicates=[],  # Filled by find_duplicates()
-            temp_files=temp_files[:500],  # Keep the 500 largest
-            cleanable_size=sum(f.size for f in temp_files),
+            temp_files=retained_temp_files,  # Keep the 500 largest
+            cleanable_size=sum(f.size for f in retained_temp_files),
             drive=drive,
             files_scanned=self.files_scanned
         )
