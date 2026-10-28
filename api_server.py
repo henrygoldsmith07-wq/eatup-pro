@@ -107,8 +107,11 @@ def require_auth(f):
         api_key = request.headers.get('X-API-Key', '')
         if expected and not hmac.compare_digest(api_key, expected):
             return jsonify({'error': 'Unauthorized'}), 401
-        if request.method == 'POST' and not request.is_json:
-            return jsonify({'error': 'Content-Type must be application/json'}), 415
+        if request.method == 'POST':
+            if not request.is_json:
+                return jsonify({'error': 'Content-Type must be application/json'}), 415
+            if not isinstance(request.get_json(silent=True), dict):
+                return jsonify({'error': 'JSON body must be an object'}), 400
         return f(*args, **kwargs)
     return decorated
 

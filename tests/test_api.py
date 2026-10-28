@@ -61,6 +61,8 @@ def test_cleanup_requires_scan_and_json(client):
     # A cross-site form post (no JSON content type) must be refused
     assert client.post("/api/v1/cleanup/run", data="type=smart",
                        content_type="text/plain").status_code == 415
+    assert client.post("/api/v1/cleanup/run", json=["smart"]).status_code == 400
+    assert client.post("/api/v1/scan/start", json=[client.scan_root]).status_code == 400
 
 
 def test_scan_start_rejects_invalid_drive(client):
