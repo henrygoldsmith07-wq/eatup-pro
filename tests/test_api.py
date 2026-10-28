@@ -66,6 +66,8 @@ def test_cleanup_requires_scan_and_json(client):
 def test_scan_start_rejects_invalid_drive(client):
     assert client.post("/api/v1/scan/start", json={"drive": 7}).status_code == 400
     assert client.post("/api/v1/scan/start", json={"drive": "  "}).status_code == 400
+    assert client.post("/api/v1/scan/start", json={"drive": client.scan_root,
+                                                    "find_duplicates": "false"}).status_code == 400
     scan_id = client.post("/api/v1/scan/start", json={"drive": client.scan_root}).get_json()["scan_id"]
     assert wait_for_scan(client, scan_id)["status"] == "complete"
 
@@ -83,6 +85,10 @@ def test_cleanup_dry_run(client):
     wait_for_scan(client, scan_id)
     body = client.post("/api/v1/cleanup/run", json={"type": "smart", "dry_run": True}).get_json()
     assert body["status"] == "preview" and body["files_deleted"] == 0
+
+
+def test_cleanup_rejects_non_boolean_dry_run(client):
+    assert client.post("/api/v1/cleanup/run", json={"dry_run": "false"}).status_code == 400
 
 
 def test_api_key_enforced(client, monkeypatch):

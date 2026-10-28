@@ -117,6 +117,14 @@ def is_scan_running():
     return any(job['status'] == 'running' for job in scan_jobs.values())
 
 
+def get_json_bool(data, name, default):
+    """Read a JSON boolean without coercing strings or numbers by truthiness."""
+    value = data.get(name, default)
+    if not isinstance(value, bool):
+        raise ValueError(f'{name} must be a boolean')
+    return value
+
+
 # ==================== WEB UI ====================
 
 @app.route('/')
@@ -154,7 +162,10 @@ def scan_start():
     drive = data.get('drive', 'C:')
     if not isinstance(drive, str) or not drive.strip():
         return jsonify({'error': 'drive must be a non-empty string'}), 400
-    with_duplicates = data.get('find_duplicates', True)
+    try:
+        with_duplicates = get_json_bool(data, 'find_duplicates', True)
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
     
     with scan_lock:
         running = next((sid for sid, job in scan_jobs.items() if job['status'] == 'running'), None)
@@ -259,7 +270,10 @@ def cleanup_run():
     try:
         data = request.json or {}
         cleanup_type = data.get('type', 'smart')
-        dry_run = bool(data.get('dry_run', False))
+        try:
+            dry_run = get_json_bool(data, 'dry_run', False)
+        except ValueError as e:
+            return jsonify({'error': str(e)}), 400
         
         cleaner_obj = get_cleaner()
         if is_scan_running():
