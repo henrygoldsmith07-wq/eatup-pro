@@ -104,6 +104,19 @@ def test_foreign_host_rejected(client):
     assert client.get("/api/v1/health", headers={"Host": "evil.example:5000"}).status_code == 403
 
 
+def test_analytics_limits_reject_non_positive_and_cap_large_values(client, monkeypatch):
+    db = api_server.get_db()
+    received = []
+    monkeypatch.setattr(db, "get_recent_scans", lambda limit: received.append(limit) or [])
+    monkeypatch.setattr(db, "get_cleanup_history", lambda limit: received.append(limit) or [])
+
+    for endpoint in ("/api/v1/analytics/scans", "/api/v1/analytics/cleanup-history"):
+        assert client.get(f"{endpoint}?limit=-1").status_code == 400
+        assert client.get(f"{endpoint}?limit=0").status_code == 400
+        assert client.get(f"{endpoint}?limit=999999").status_code == 200
+    assert received == [500, 500]
+
+
 def test_export_and_analytics(client):
     assert client.get("/api/v1/export/report").status_code == 404
     assert client.get("/api/v1/analytics/statistics").status_code == 200

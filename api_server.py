@@ -128,6 +128,18 @@ def get_json_bool(data, name, default):
     return value
 
 
+def get_query_limit(default, maximum=500):
+    """Parse a positive bounded result limit, returning a client error if invalid."""
+    raw = request.args.get('limit', default)
+    try:
+        limit = int(raw)
+    except (TypeError, ValueError):
+        abort(400, description='limit must be a positive integer')
+    if limit < 1:
+        abort(400, description='limit must be a positive integer')
+    return min(limit, maximum)
+
+
 # ==================== WEB UI ====================
 
 @app.route('/')
@@ -476,7 +488,7 @@ def cloud_get_files():
     try:
         cloud_manager = get_cloud_manager()
         
-        limit = request.args.get('limit', 100, type=int)
+        limit = get_query_limit(100)
         files = cloud_manager.get_all_files(limit=limit)
         
         return jsonify({
@@ -540,7 +552,7 @@ def analytics_scans():
     """Get list of recent scans"""
     try:
         db = get_db()
-        limit = request.args.get('limit', 10, type=int)
+        limit = get_query_limit(10)
         
         scans = db.get_recent_scans(limit=limit)
         
@@ -565,7 +577,7 @@ def analytics_cleanup_history():
     """Get history of cleanup operations"""
     try:
         db = get_db()
-        limit = request.args.get('limit', 20, type=int)
+        limit = get_query_limit(20)
         
         history = db.get_cleanup_history(limit=limit)
         
