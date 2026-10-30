@@ -2,7 +2,7 @@
 
 A modern, powerful disk space analyzer and cleanup tool for Windows. Analyze your storage, find duplicates, remove temporary files, and reclaim valuable space safely.
 
-**Latest Version**: v1.1.0 with **real duplicate detection**, **enhanced AI suggestions**, and **production-ready deployment configuration**
+**Latest Version**: v1.2.0 with **real duplicate detection**, **enhanced AI suggestions**, and **production-ready deployment configuration**
 
 ## 🌟 Features
 
@@ -23,7 +23,7 @@ A modern, powerful disk space analyzer and cleanup tool for Windows. Analyze you
 - REST API for integration with external tools
 - Desktop app wrapper (Electron) and mobile companion (React Native)
 
-## 🆕 Version 1.1.0 Improvements
+## 🆕 Version 1.2.0 Improvements
 
 ### Major Enhancements
 - **Real Duplicate Detection**: MD5-based content hashing finds identical files across your system, replacing placeholder mock data
@@ -89,6 +89,22 @@ Then select from the menu:
 - **5** - Smart Cleanup (All recommended items)
 - **6** - Export Report (JSON format)
 - **7** - Exit
+
+#### Method 3: Scheduled Tasks
+```bash
+python scheduler.py
+```
+
+`python scheduler.py` opens a menu-driven manager for scheduled scans and
+cleanups. Tasks are stored in `scheduled_tasks.json` next to the code, and each
+run is logged to `scheduled_tasks_logs.json`. From the menu you can:
+
+- Add a task (name, drive, frequency `daily`/`weekly`/`monthly`, `HH:MM` time,
+  and comma-separated actions such as `scan`, `cleanup_temp`, `smart_cleanup`)
+- View upcoming runs and recent run logs
+- Enable/disable or delete tasks, run a task immediately
+- Start/stop the in-process background scheduler (requires the `schedule`
+  package; without it you can still create and run tasks manually)
 
 ### Understanding Results
 

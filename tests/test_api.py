@@ -61,6 +61,25 @@ def test_cleanup_requires_scan_and_json(client):
     # A cross-site form post (no JSON content type) must be refused
     assert client.post("/api/v1/cleanup/run", data="type=smart",
                        content_type="text/plain").status_code == 415
+    assert client.post("/api/v1/cleanup/run", json=["smart"]).status_code == 400
+    assert client.post("/api/v1/scan/start", json=[client.scan_root]).status_code == 400
+
+
+def test_scan_start_rejects_invalid_drive(client):
+    assert client.post("/api/v1/scan/start", json={"drive": 7}).status_code == 400
+    assert client.post("/api/v1/scan/start", json={"drive": "  "}).status_code == 400
+    assert client.post("/api/v1/scan/start", json={"drive": client.scan_root,
+                                                    "find_duplicates": "false"}).status_code == 400
+    scan_id = client.post("/api/v1/scan/start", json={"drive": client.scan_root}).get_json()["scan_id"]
+    assert wait_for_scan(client, scan_id)["status"] == "complete"
+
+
+def test_cleanup_rejects_bad_min_size(client):
+    scan_id = client.post("/api/v1/scan/start", json={"drive": client.scan_root}).get_json()["scan_id"]
+    wait_for_scan(client, scan_id)
+    assert client.post("/api/v1/cleanup/run", json={"type": "large", "min_size_gb": "big"}).status_code == 400
+    assert client.post("/api/v1/cleanup/run", json={"type": "large", "min_size_gb": -2}).status_code == 400
+    assert client.post("/api/v1/cleanup/run", json={"type": "large"}).status_code == 200
 
 
 def test_cleanup_dry_run(client):
@@ -68,6 +87,10 @@ def test_cleanup_dry_run(client):
     wait_for_scan(client, scan_id)
     body = client.post("/api/v1/cleanup/run", json={"type": "smart", "dry_run": True}).get_json()
     assert body["status"] == "preview" and body["files_deleted"] == 0
+
+
+def test_cleanup_rejects_non_boolean_dry_run(client):
+    assert client.post("/api/v1/cleanup/run", json={"dry_run": "false"}).status_code == 400
 
 
 def test_api_key_enforced(client, monkeypatch):
@@ -81,7 +104,42 @@ def test_foreign_host_rejected(client):
     assert client.get("/api/v1/health", headers={"Host": "evil.example:5000"}).status_code == 403
 
 
+def test_analytics_limits_reject_non_positive_and_cap_large_values(client, monkeypatch):
+    db = api_server.get_db()
+    received = []
+    monkeypatch.setattr(db, "get_recent_scans", lambda limit: received.append(limit) or [])
+    monkeypatch.setattr(db, "get_cleanup_history", lambda limit: received.append(limit) or [])
+
+    for endpoint in ("/api/v1/analytics/scans", "/api/v1/analytics/cleanup-history"):
+        assert client.get(f"{endpoint}?limit=-1").status_code == 400
+        assert client.get(f"{endpoint}?limit=0").status_code == 400
+        assert client.get(f"{endpoint}?limit=999999").status_code == 200
+    assert received == [500, 500]
+
+
 def test_export_and_analytics(client):
     assert client.get("/api/v1/export/report").status_code == 404
     assert client.get("/api/v1/analytics/statistics").status_code == 200
     assert client.get("/api/v1/analytics/trends").get_json()["data_points"] == 0
+
+
+def test_trends_cache_hit(tmp_path):
+    db = AnalyticsDatabase(tmp_path / "cache.db")
+    try:
+        assert db.get_cached_trends() is None
+        # Freshness is per-day (DATE column): a row cached the previous day
+        # must not be returned
+        db.conn.execute("INSERT INTO trends_cache (calculation_date, daily_growth_mb)"
+                        " VALUES (date('now', '-1 day'), 9.0)")
+        db.conn.commit()
+        assert db.get_cached_trends(max_age_hours=12) is None
+        # A row cached today must be returned. Regression: the old query compared
+        # the DATE column against datetime(), so it could never match anything.
+        db.cache_trends({"daily_growth_mb": 1.5, "weekly_growth_mb": 10.5,
+                         "monthly_growth_mb": 45.0, "average_utilization": 62.0,
+                         "prediction_next_30_days_mb": 45.0})
+        cached = db.get_cached_trends(max_age_hours=12)
+        assert cached is not None
+        assert cached["daily_growth_mb"] == 1.5
+    finally:
+        db.close()

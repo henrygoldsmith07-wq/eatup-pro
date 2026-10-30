@@ -107,14 +107,37 @@ def require_auth(f):
         api_key = request.headers.get('X-API-Key', '')
         if expected and not hmac.compare_digest(api_key, expected):
             return jsonify({'error': 'Unauthorized'}), 401
-        if request.method == 'POST' and not request.is_json:
-            return jsonify({'error': 'Content-Type must be application/json'}), 415
+        if request.method == 'POST':
+            if not request.is_json:
+                return jsonify({'error': 'Content-Type must be application/json'}), 415
+            if not isinstance(request.get_json(silent=True), dict):
+                return jsonify({'error': 'JSON body must be an object'}), 400
         return f(*args, **kwargs)
     return decorated
 
 
 def is_scan_running():
     return any(job['status'] == 'running' for job in scan_jobs.values())
+
+
+def get_json_bool(data, name, default):
+    """Read a JSON boolean without coercing strings or numbers by truthiness."""
+    value = data.get(name, default)
+    if not isinstance(value, bool):
+        raise ValueError(f'{name} must be a boolean')
+    return value
+
+
+def get_query_limit(default, maximum=500):
+    """Parse a positive bounded result limit, returning a client error if invalid."""
+    raw = request.args.get('limit', default)
+    try:
+        limit = int(raw)
+    except (TypeError, ValueError):
+        abort(400, description='limit must be a positive integer')
+    if limit < 1:
+        abort(400, description='limit must be a positive integer')
+    return min(limit, maximum)
 
 
 # ==================== WEB UI ====================
@@ -152,7 +175,12 @@ def scan_start():
     """Start a new drive scan in the background"""
     data = request.json or {}
     drive = data.get('drive', 'C:')
-    with_duplicates = data.get('find_duplicates', True)
+    if not isinstance(drive, str) or not drive.strip():
+        return jsonify({'error': 'drive must be a non-empty string'}), 400
+    try:
+        with_duplicates = get_json_bool(data, 'find_duplicates', True)
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
     
     with scan_lock:
         running = next((sid for sid, job in scan_jobs.items() if job['status'] == 'running'), None)
@@ -257,7 +285,10 @@ def cleanup_run():
     try:
         data = request.json or {}
         cleanup_type = data.get('type', 'smart')
-        dry_run = bool(data.get('dry_run', False))
+        try:
+            dry_run = get_json_bool(data, 'dry_run', False)
+        except ValueError as e:
+            return jsonify({'error': str(e)}), 400
         
         cleaner_obj = get_cleaner()
         if is_scan_running():
@@ -271,7 +302,12 @@ def cleanup_run():
         elif cleanup_type == 'duplicates':
             result = cleaner_obj.cleanup_duplicates(dry_run=dry_run)
         elif cleanup_type == 'large':
-            min_size = float(data.get('min_size_gb', 1))
+            try:
+                min_size = float(data.get('min_size_gb', 1))
+            except (TypeError, ValueError):
+                return jsonify({'error': 'min_size_gb must be a number'}), 400
+            if min_size <= 0:
+                return jsonify({'error': 'min_size_gb must be positive'}), 400
             result = cleaner_obj.cleanup_large_files(min_size_gb=min_size, dry_run=dry_run)
         elif cleanup_type == 'smart':
             result = cleaner_obj.smart_cleanup(dry_run=dry_run)
@@ -452,7 +488,7 @@ def cloud_get_files():
     try:
         cloud_manager = get_cloud_manager()
         
-        limit = request.args.get('limit', 100, type=int)
+        limit = get_query_limit(100)
         files = cloud_manager.get_all_files(limit=limit)
         
         return jsonify({
@@ -516,7 +552,7 @@ def analytics_scans():
     """Get list of recent scans"""
     try:
         db = get_db()
-        limit = request.args.get('limit', 10, type=int)
+        limit = get_query_limit(10)
         
         scans = db.get_recent_scans(limit=limit)
         
@@ -541,7 +577,7 @@ def analytics_cleanup_history():
     """Get history of cleanup operations"""
     try:
         db = get_db()
-        limit = request.args.get('limit', 20, type=int)
+        limit = get_query_limit(20)
         
         history = db.get_cleanup_history(limit=limit)
         
@@ -647,7 +683,13 @@ def internal_error(error):
 
 def main():
     """Start the API server"""
-    port = int(os.getenv('PORT', 5000))
+    import argparse
+
+    parser = argparse.ArgumentParser(description='EatUp Pro API server')
+    parser.add_argument('--port', type=int, default=int(os.getenv('PORT', 5000)),
+                        help='Port to listen on (default: $PORT or 5000)')
+    args = parser.parse_args()
+    port = args.port
     debug = os.getenv('DEBUG', 'false').lower() == 'true'
     
     print(f"Starting EatUp Pro API Server on {HOST}:{port}")

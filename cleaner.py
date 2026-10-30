@@ -145,15 +145,17 @@ class EatUpCleaner:
 
         large_files.sort(key=lambda f: f.size, reverse=True)
         temp_files.sort(key=lambda f: f.size, reverse=True)
+        retained_large_files = large_files[:100]
+        retained_temp_files = temp_files[:500]
 
         self.scan_results = ScanResult(
             total_used=usage.used,
             total_space=usage.total,
             categories=categories,
-            large_files=large_files[:100],  # Keep the 100 largest
+            large_files=retained_large_files,  # Keep the 100 largest
             duplicates=[],  # Filled by find_duplicates()
-            temp_files=temp_files[:500],  # Keep the 500 largest
-            cleanable_size=sum(f.size for f in temp_files),
+            temp_files=retained_temp_files,  # Keep the 500 largest
+            cleanable_size=sum(f.size for f in retained_temp_files),
             drive=drive,
             files_scanned=self.files_scanned
         )
@@ -324,6 +326,12 @@ class EatUpCleaner:
     def _remaining(files: List[FileInfo]) -> List[FileInfo]:
         return [f for f in files if os.path.exists(f.path)]
 
+    def _recompute_cleanable_size(self) -> None:
+        """Drop cleaned files from the reported reclaimable space"""
+        self.scan_results.cleanable_size = (
+            sum(f.size for f in self.scan_results.temp_files) + self.duplicate_bytes()
+        )
+
     def cleanup_temp_files(self, dry_run: bool = False) -> CleanupResult:
         """Move scanned temporary files to the Recycle Bin"""
         print("🗑️ Cleaning temporary files...")
@@ -333,6 +341,7 @@ class EatUpCleaner:
         result = self._recycle_files(self.scan_results.temp_files, dry_run)
         if not dry_run:
             self.scan_results.temp_files = self._remaining(self.scan_results.temp_files)
+            self._recompute_cleanable_size()
 
         print(f"✅ Freed {result.freed_bytes / GB:.2f} GB ({result.files_deleted} files)")
         return result
@@ -357,6 +366,7 @@ class EatUpCleaner:
                 group for group in (self._remaining(g) for g in self.scan_results.duplicates)
                 if len(group) > 1
             ]
+            self._recompute_cleanable_size()
 
         print(f"✅ Freed {result.freed_bytes / GB:.2f} GB ({result.files_deleted} files)")
         return result

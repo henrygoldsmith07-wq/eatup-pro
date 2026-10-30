@@ -75,6 +75,22 @@ def test_find_duplicates_keeps_oldest_first(tree):
     assert c.duplicate_bytes() == 12
 
 
+def test_cleanable_size_matches_retained_temp_candidates(tmp_path, monkeypatch):
+    monkeypatch.setattr(cleaner, "ROOT_TEMP_DIRS", set())
+    old = time.time() - 3 * 86400
+    temp_dir = tmp_path / "files"
+    temp_dir.mkdir()
+    for index in range(501):
+        path = temp_dir / f"file-{index}.tmp"
+        path.write_bytes(bytes([index % 256]))
+        os.utime(path, (old, old))
+
+    result = EatUpCleaner().scan_drive(str(tmp_path))
+
+    assert len(result.temp_files) == 500
+    assert result.cleanable_size == sum(file.size for file in result.temp_files)
+
+
 def test_unreadable_files_are_not_grouped(tree, monkeypatch):
     monkeypatch.setattr(EatUpCleaner, "_compute_file_hash", staticmethod(lambda *a: None))
     c = EatUpCleaner()
@@ -125,3 +141,16 @@ def test_delete_errors_are_reported(tree, monkeypatch):
     c.scan_drive(str(tree))
     result = c.cleanup_temp_files()
     assert result.files_deleted == 0 and len(result.errors) == 1
+
+
+def test_cleanable_size_shrinks_after_cleanup(tree, monkeypatch):
+    monkeypatch.setattr(cleaner, "move_to_recycle_bin", lambda p: os.remove(p))
+    c = EatUpCleaner()
+    c.scan_drive(str(tree))
+    c.find_duplicates()
+    # 10 bytes of temp files + 12 bytes of duplicate copies
+    assert c.scan_results.cleanable_size == 22
+
+    c.smart_cleanup()
+    # Cleaned files must no longer be reported as reclaimable space
+    assert c.scan_results.cleanable_size == 0
