@@ -54,6 +54,10 @@ scan_jobs = {}
 scan_lock = threading.Lock()
 latest_scan_id = None
 
+# Scheduled-task runs can scan a drive, so they must not block a request thread.
+task_jobs = {}
+task_lock = threading.Lock()
+
 
 def get_cleaner():
     """Lazy initialization of cleaner"""
@@ -437,24 +441,60 @@ def schedule_list():
         return jsonify({'error': str(e)}), 500
 
 
+def run_task_job(job_id, task_id):
+    """Background worker for a manually triggered scheduled task"""
+    job = task_jobs[job_id]
+    try:
+        log = get_scheduler().run_task(task_id)
+        job.update(
+            status=log.status,
+            files_processed=log.files_processed,
+            space_freed_mb=log.space_freed_mb,
+            error=log.error_message,
+        )
+    except Exception as e:
+        job['status'] = 'failed'
+        job['error'] = str(e)
+    finally:
+        job['finished_at'] = time.time()
+
+
 @app.route('/api/v1/schedule/<task_id>/run', methods=['POST'])
 @require_auth
 def schedule_run(task_id):
-    """Manually run a scheduled task"""
+    """Start a scheduled task in the background"""
     try:
         scheduler_obj = get_scheduler()
-        
-        log = scheduler_obj.run_task(task_id)
-        
-        return jsonify({
-            'status': 'completed',
-            'files_processed': log.files_processed,
-            'space_freed_mb': log.space_freed_mb,
-            'duration_seconds': (log.completed_at - log.started_at).total_seconds() if log.completed_at else None
-        })
-    
+        if task_id not in scheduler_obj.tasks:
+            return jsonify({'error': 'Unknown task_id'}), 404
+
+        with task_lock:
+            running = next((jid for jid, job in task_jobs.items()
+                            if job['task_id'] == task_id and job['status'] == 'running'), None)
+            if running:
+                return jsonify({'error': 'This task is already running', 'job_id': running}), 409
+            job_id = str(uuid.uuid4())
+            task_jobs[job_id] = {
+                'job_id': job_id, 'task_id': task_id, 'status': 'running',
+                'error': None, 'files_processed': 0, 'space_freed_mb': 0.0,
+                'started_at': time.time(), 'finished_at': None,
+            }
+
+        threading.Thread(target=run_task_job, args=(job_id, task_id), daemon=True).start()
+        return jsonify({'status': 'started', 'job_id': job_id}), 202
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/v1/schedule/jobs/<job_id>', methods=['GET'])
+@require_auth
+def schedule_job_status(job_id):
+    """Get the state of a manually triggered scheduled task"""
+    job = task_jobs.get(job_id)
+    if job is None:
+        return jsonify({'error': 'Unknown job_id'}), 404
+    return jsonify(job)
 
 
 # ==================== CLOUD STORAGE ====================

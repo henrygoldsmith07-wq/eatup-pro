@@ -304,8 +304,10 @@ curl http://localhost:5000/api/v1/usage/stats
 # List schedules
 curl http://localhost:5000/api/v1/schedule/list
 
-# Run scheduled task (requires auth)
+# Run scheduled task (requires auth); returns 202 and a job_id
 Invoke-RestMethod -Uri "http://localhost:5000/api/v1/schedule/TASK_ID/run" -Method POST -Headers @{ "X-API-Key"="my-secret-key"}
+# Poll it until status is no longer 'running'
+Invoke-RestMethod -Uri "http://localhost:5000/api/v1/schedule/jobs/JOB_ID" -Headers @{ "X-API-Key"="my-secret-key"}
 
 # Export report
 curl http://localhost:5000/api/v1/export/report -o report.json

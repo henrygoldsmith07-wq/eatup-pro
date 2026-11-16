@@ -5,6 +5,7 @@ import pytest
 import api_server
 import cleaner
 from data.analytics_db import AnalyticsDatabase
+from scheduler import SchedulerManager
 
 
 @pytest.fixture
@@ -14,6 +15,7 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(api_server, "cleaner", None)
     monkeypatch.setattr(api_server, "db", AnalyticsDatabase(tmp_path / "test.db"))
     monkeypatch.setattr(api_server, "scan_jobs", {})
+    monkeypatch.setattr(api_server, "task_jobs", {})
     monkeypatch.setattr(api_server, "latest_scan_id", None)
     monkeypatch.delenv("API_KEY", raising=False)
     (tmp_path / "files").mkdir()
@@ -124,6 +126,24 @@ def test_cloud_connect_is_not_implemented(client):
         response = client.post(f"/api/v1/cloud/connect/{service}", json={})
         assert response.status_code == 501
         assert response.get_json()["error"] == "Not implemented"
+
+
+def test_schedule_run_is_backgrounded(client, monkeypatch, tmp_path):
+    manager = SchedulerManager(str(tmp_path / "tasks.json"))
+    task_id = manager.add_task("Quick", drive=client.scan_root, actions=["scan"])
+    monkeypatch.setattr(api_server, "scheduler", manager)
+
+    response = client.post(f"/api/v1/schedule/{task_id}/run", json={})
+    assert response.status_code == 202
+    job_id = response.get_json()["job_id"]
+    for _ in range(100):
+        job = client.get(f"/api/v1/schedule/jobs/{job_id}").get_json()
+        if job["status"] != "running":
+            break
+        time.sleep(0.05)
+    assert job["status"] == "completed", job
+    assert client.get("/api/v1/schedule/jobs/unknown").status_code == 404
+    assert client.post("/api/v1/schedule/missing/run", json={}).status_code == 404
 
 
 def test_cloud_files_and_stats_are_not_implemented(client):
