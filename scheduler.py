@@ -405,6 +405,10 @@ class SchedulerManager:
                          .replace('>', '&gt;').replace('"', '&quot;'))
         safe_script_path = (script_path.replace('&', '&amp;').replace('<', '&lt;')
                            .replace('>', '&gt;').replace('"', '&quot;'))
+        # Use the exact interpreter running the app: a bare python.exe on PATH
+        # may resolve to the Windows Store stub and fail silently in the task.
+        safe_python = (sys.executable.replace('&', '&amp;').replace('<', '&lt;')
+                       .replace('>', '&gt;').replace('"', '&quot;'))
         task_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <RegistrationInfo>
@@ -442,7 +446,7 @@ class SchedulerManager:
   </Triggers>
   <Actions>
     <Exec>
-      <Command>python.exe</Command>
+      <Command>{safe_python}</Command>
       <Arguments>"{safe_script_path}" --auto-run "{task_id}"</Arguments>
     </Exec>
   </Actions>

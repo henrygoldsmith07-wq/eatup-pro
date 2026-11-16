@@ -45,10 +45,11 @@ set /p choice="Enter your choice (1-2): "
 
 if "%choice%"=="1" (
     echo.
-    echo Opening web interface...
-    start index.html
-    timeout /t 2 >nul
-    start app.html
+    echo Starting the API server for the web interface...
+    start "EatUp Pro API" /MIN python api_server.py
+    timeout /t 3 >nul
+    start "" http://localhost:5000/app.html
+    echo The API server is running in a separate window; close it to stop the app.
     goto :end
 )
 
@@ -60,9 +61,9 @@ if "%choice%"=="2" (
 )
 
 echo Invalid choice. Defaulting to web interface.
-start index.html
-timeout /t 2 >nul
-start app.html
+start "EatUp Pro API" /MIN python api_server.py
+timeout /t 3 >nul
+start "" http://localhost:5000/app.html
 
 :end
 echo.

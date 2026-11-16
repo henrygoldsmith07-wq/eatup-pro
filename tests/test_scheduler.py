@@ -1,3 +1,4 @@
+import sys
 import xml.etree.ElementTree as ET
 from datetime import datetime
 
@@ -56,6 +57,7 @@ def test_windows_task_xml_is_valid(tmp_path, monkeypatch):
     assert "http://schemas.microsoft.com/windows/2004/02/mit/task" in text
     ET.fromstring(text)  # must be importable by Task Scheduler
     assert "--auto-run" in text
+    assert sys.executable.replace('&', '&amp;') in text
 
 
 def test_auto_run_runs_a_task_without_the_menu(tmp_path, monkeypatch):
