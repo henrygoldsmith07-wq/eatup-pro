@@ -56,7 +56,7 @@
                 <button onclick="scanDrive()" class="text-neutral-600 dark:text-neutral-400 hover:text-brand-500 font-medium">Scan Drive</button>
                 <button onclick="showSection('storage')" class="text-neutral-600 dark:text-neutral-400 hover:text-brand-500 font-medium">Storage</button>
                 <button onclick="showSection('cleanup')" class="text-neutral-600 dark:text-neutral-400 hover:text-brand-500 font-medium">Cleanup</button>
-                <button id="themeToggle" class="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800">
+                <button id="themeToggle" aria-label="Toggle dark mode" class="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800">
                     <svg class="w-5 h-5 dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
                     <svg class="w-5 h-5 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
                 </button>
@@ -99,22 +99,22 @@
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
                 <button onclick="quickClean('temp')" class="bg-white dark:bg-neutral-800 p-6 rounded-xl border border-neutral-200 dark:border-neutral-700 hover:border-brand-500 transition-all">
                     <div class="text-3xl mb-2">🗑️</div>
-                    <h3 class="font-bold">Clear Temp Files</h3>
+                    <h2 class="font-bold">Clear Temp Files</h2>
                     <p class="text-sm text-neutral-500">Remove temporary files</p>
                 </button>
                 <button onclick="quickClean('duplicates')" class="bg-white dark:bg-neutral-800 p-6 rounded-xl border border-neutral-200 dark:border-neutral-700 hover:border-brand-500 transition-all">
                     <div class="text-3xl mb-2">🔄</div>
-                    <h3 class="font-bold">Find Duplicates</h3>
+                    <h2 class="font-bold">Find Duplicates</h2>
                     <p class="text-sm text-neutral-500">Identify duplicate files</p>
                 </button>
                 <button onclick="quickClean('large')" class="bg-white dark:bg-neutral-800 p-6 rounded-xl border border-neutral-200 dark:border-neutral-700 hover:border-brand-500 transition-all">
                     <div class="text-3xl mb-2">💾</div>
-                    <h3 class="font-bold">Large Files</h3>
+                    <h2 class="font-bold">Large Files</h2>
                     <p class="text-sm text-neutral-500">Find files >1GB</p>
                 </button>
                 <button onclick="quickClean('all')" class="bg-gradient-to-br from-brand-500 to-brand-700 text-white p-6 rounded-xl hover:shadow-lg transition-all">
                     <div class="text-3xl mb-2">⚡</div>
-                    <h3 class="font-bold">Smart Cleanup</h3>
+                    <h2 class="font-bold">Smart Cleanup</h2>
                     <p class="text-sm opacity-90">Auto-cleanup recommended</p>
                 </button>
             </div>
