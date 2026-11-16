@@ -7,6 +7,7 @@ Supports Windows Task Scheduler integration and Python-based scheduling
 import os
 import sys
 import json
+import argparse
 import uuid
 import subprocess
 import platform
@@ -400,12 +401,15 @@ class SchedulerManager:
         """Create Windows Task Scheduler entry for auto-start on boot"""
         script_path = os.path.abspath(__file__)
         
-        task_xml = f"""
-<?xml version="1.0" encoding="UTF-16"?>
-<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/xml/task">
+        safe_task_name = (task_name.replace('&', '&amp;').replace('<', '&lt;')
+                         .replace('>', '&gt;').replace('"', '&quot;'))
+        safe_script_path = (script_path.replace('&', '&amp;').replace('<', '&lt;')
+                           .replace('>', '&gt;').replace('"', '&quot;'))
+        task_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <RegistrationInfo>
-    <Description>EatUp Pro Scheduled Scanner - {task_name}</Description>
-    <URI>\\{task_name}</URI>
+    <Description>EatUp Pro Scheduled Scanner - {safe_task_name}</Description>
+    <URI>\\{safe_task_name}</URI>
   </RegistrationInfo>
   <Settings>
     <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
@@ -439,24 +443,35 @@ class SchedulerManager:
   <Actions>
     <Exec>
       <Command>python.exe</Command>
-      <Arguments>"{script_path}" --auto-run "{task_id}"</Arguments>
+      <Arguments>"{safe_script_path}" --auto-run "{task_id}"</Arguments>
     </Exec>
   </Actions>
 </Task>
 """
         # Save XML file for manual task creation
         task_xml_file = f"eatup_task_{task_id}.xml"
-        with open(task_xml_file, 'w') as f:
+        with open(task_xml_file, 'w', encoding='utf-8') as f:
             f.write(task_xml)
         
         print(f"Created Task Scheduler XML: {task_xml_file}")
-        print("Import this into Task Scheduler or use: schtasks /create /tn \"EatUp {task_name}\" /xml \"{task_xml_file}\"")
+        print(f'Import this into Task Scheduler or use: schtasks /create /tn "EatUp {safe_task_name}" /xml "{task_xml_file}"')
 
 
-def main():
+def main(argv=None):
     """CLI interface for scheduled tasks"""
+    parser = argparse.ArgumentParser(description='EatUp Pro scheduled tasks')
+    parser.add_argument('--auto-run', metavar='TASK_ID',
+                        help='run one task non-interactively (used by Task Scheduler)')
+    args = parser.parse_args(argv)
+
     manager = SchedulerManager()
-    
+    if args.auto_run:
+        if args.auto_run not in manager.tasks:
+            print(f"Unknown task id: {args.auto_run}")
+            return 1
+        log = manager.run_task(args.auto_run)
+        return 0 if log.status == 'completed' else 1
+
     print("=" * 60)
     print("EATUP PRO - Scheduled Scanning Management")
     print("=" * 60)
@@ -530,10 +545,11 @@ def main():
         elif choice == '9':
             print("Goodbye!")
             break
-        
+
         else:
             print("Invalid choice")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

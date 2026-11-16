@@ -6,6 +6,7 @@ import {
   SafeAreaView,
   TouchableOpacity,
   FlatList,
+  ScrollView,
   ActivityIndicator,
   StatusBar,
   RefreshControl,
@@ -14,7 +15,8 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
-const API_URL = 'http://localhost:5000/api/v1'; // Local network URL
+// Expo sets EXPO_PUBLIC_* at build time; a phone cannot reach the PC at localhost.
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 
 export default function App() {
   const [scanStatus, setScanStatus] = useState('idle');
@@ -25,8 +27,18 @@ export default function App() {
 
   useEffect(() => {
     loadCleanupHistory();
+    loadThemePreference();
     fetchUsageStats();
   }, []);
+
+  const loadThemePreference = async () => {
+    try {
+      const saved = await AsyncStorage.getItem('theme_preference');
+      if (saved === 'dark' || saved === 'light') setThemeMode(saved);
+    } catch (error) {
+      console.log('Error loading theme:', error);
+    }
+  };
 
   const loadCleanupHistory = async () => {
     try {
@@ -49,6 +61,32 @@ export default function App() {
     }
   };
 
+  const pollScan = async (scanId, attempts = 0) => {
+    try {
+      const response = await fetch(`${API_URL}/scan/status/${scanId}`);
+      const status = await response.json();
+      if (status.status === 'complete') {
+        await fetchUsageStats();
+        setScanStatus('complete');
+        showNotification('Scan Complete!');
+        return;
+      }
+      if (status.status === 'failed') {
+        setScanStatus('idle');
+        Alert.alert('Scan failed', status.message || 'Unknown error');
+        return;
+      }
+    } catch (error) {
+      console.log('Scan status error:', error);
+    }
+    if (attempts < 60) {
+      setTimeout(() => pollScan(scanId, attempts + 1), 1000);
+    } else {
+      setScanStatus('idle');
+      Alert.alert('Scan timed out', 'The server did not finish the scan in time.');
+    }
+  };
+
   const startScan = async () => {
     try {
       setScanStatus('scanning');
@@ -57,17 +95,15 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ drive: 'C:' })
       });
-      
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
       const result = await response.json();
-      
-      setTimeout(() => {
-        fetchUsageStats();
-        setScanStatus('complete');
-        showNotification('Scan Complete!');
-      }, 5000);
+      if (!result.scan_id) throw new Error('No scan id returned');
+      pollScan(result.scan_id);
     } catch (error) {
       console.log('Scan Error:', error);
       setScanStatus('idle');
+      Alert.alert('Scan error', 'Could not start the scan. Check the API server.');
     }
   };
 
@@ -81,8 +117,6 @@ export default function App() {
           { 
             text: 'Clean', 
             onPress: async () => {
-              const cleanupStartTime = Date.now();
-              
               const response = await fetch(`${API_URL}/cleanup/run`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -137,7 +171,7 @@ export default function App() {
   };
 
   const renderDiskUsage = () => {
-    const percentage = diskUsage.percent || 0;
+    const percentage = diskUsage.percent_used || 0;
     let color = '#10b981'; // green
     if (percentage > 70) color = '#f59e0b'; // yellow
     if (percentage > 90) color = '#ef4444'; // red
@@ -165,8 +199,7 @@ export default function App() {
               borderRightWidth: 12,
               borderBottomWidth: 12,
               borderLeftWidth: 12,
-              borderColor: `${color} ${getFillColor()} transparent transparent transparent`,
-              borderImageSource: null
+              borderColor: color
             }]} />
           </View>
           <View style={styles.circleText}>
@@ -223,7 +256,7 @@ export default function App() {
 
           <TouchableOpacity 
             style={[styles.actionButton, styles.scheduleButton]}
-            onPress={() => {}}
+            onPress={() => Alert.alert('Scheduling', 'Create and manage schedules in the desktop app or through the REST API.')}
           >
             <Ionicons name="calendar-outline" size={32} color="#fff" />
             <Text style={styles.actionButtonText}>Schedule</Text>
@@ -231,7 +264,7 @@ export default function App() {
 
           <TouchableOpacity 
             style={[styles.actionButton, styles.cloudButton]}
-            onPress={() => {}}
+            onPress={() => Alert.alert('Cloud Sync', 'Cloud connections are not available in this release.')}
           >
             <Ionicons name="cloud-outline" size={32} color="#fff" />
             <Text style={styles.actionButtonText}>Cloud Sync</Text>
@@ -283,7 +316,7 @@ export default function App() {
   const getColorSuccess = () => '#10b981';
   const getSecondaryColor = () => themeMode === 'dark' ? '#9ca3af' : '#6b7280';
   
-  const stylesApp = StyleSheet.create({
+  const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: getBackgroundColor() },
     header: { padding: 16, backgroundColor: getCardBackground() },
     headerTitle: { fontSize: 24, fontWeight: 'bold', color: getColorPrimary() },

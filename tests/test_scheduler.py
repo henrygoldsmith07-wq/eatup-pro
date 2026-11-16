@@ -1,8 +1,9 @@
+import xml.etree.ElementTree as ET
 from datetime import datetime
 
 import pytest
 
-from scheduler import ScanSchedule, SchedulerManager
+from scheduler import ScanSchedule, SchedulerManager, main as scheduler_main
 
 
 def schedule(**kwargs):
@@ -44,3 +45,24 @@ def test_add_task_validates_input(tmp_path):
         manager.add_task("x", frequency="hourly")
     with pytest.raises(ValueError):
         manager.add_task("x", actions=["rm_rf"])
+
+
+def test_windows_task_xml_is_valid(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    SchedulerManager.create_windows_task("task_1", "Nightly & <weekly>")
+    xml_file = tmp_path / "eatup_task_task_1.xml"
+    text = xml_file.read_text(encoding="utf-8")
+    assert 'encoding="UTF-8"' in text
+    assert "http://schemas.microsoft.com/windows/2004/02/mit/task" in text
+    ET.fromstring(text)  # must be importable by Task Scheduler
+    assert "--auto-run" in text
+
+
+def test_auto_run_runs_a_task_without_the_menu(tmp_path, monkeypatch):
+    config = str(tmp_path / "tasks.json")
+    manager = SchedulerManager(config)
+    task_id = manager.add_task("Nightly", drive=str(tmp_path), actions=["scan"])
+    # main() creates its own manager; hand it the one backed by this tmp config
+    monkeypatch.setattr("scheduler.SchedulerManager", lambda *a, **k: manager)
+    assert scheduler_main(["--auto-run", task_id]) == 0
+    assert scheduler_main(["--auto-run", "missing"]) == 1

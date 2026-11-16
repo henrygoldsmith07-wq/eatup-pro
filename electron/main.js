@@ -6,12 +6,13 @@ let pythonProcess = null;
 let tray = null;
 
 const PORT = process.env.PORT || 5000;
+const PYTHON = process.env.PYTHON || 'python';
 const BACKEND_URL = `http://127.0.0.1:${PORT}`;
 const PROJECT_ROOT = path.join(__dirname, '..');
 
 // Python backend process
 function startPythonBackend() {
-    pythonProcess = spawn('python', ['api_server.py'], {
+    pythonProcess = spawn(PYTHON, ['api_server.py'], {
         cwd: PROJECT_ROOT,
         env: { ...process.env, PORT: PORT }
     });
@@ -37,6 +38,30 @@ async function waitForBackend(timeoutMs = 15000) {
         await new Promise(resolve => setTimeout(resolve, 300));
     }
     return false;
+}
+
+async function postApi(endpoint, body) {
+    const response = await fetch(`${BACKEND_URL}${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    });
+    if (!response.ok) {
+        throw new Error(`Backend returned ${response.status} for ${endpoint}`);
+    }
+    return response.json();
+}
+
+function startScan() {
+    return postApi('/api/v1/scan/start', { drive: 'C:' });
+}
+
+function runCleanup(type = 'smart') {
+    return postApi('/api/v1/cleanup/run', { type });
+}
+
+function logActionFailure(error) {
+    console.error('EatUp action failed:', error);
 }
 
 async function createWindow() {
@@ -94,11 +119,11 @@ async function createWindow() {
                 {
                     label: 'Scan Drive',
                     accelerator: 'CmdOrCtrl+S',
-                    click: () => mainWindow.webContents.send('scan-start')
+                    click: () => startScan().catch(logActionFailure)
                 },
                 {
                     label: 'Smart Cleanup',
-                    click: () => mainWindow.webContents.send('cleanup-run', { type: 'smart' })
+                    click: () => runCleanup('smart').catch(logActionFailure)
                 }
             ]
         }
@@ -120,11 +145,11 @@ function setupTray(parentWindow) {
     const contextMenu = Menu.buildFromTemplate([
         {
             label: 'Quick Scan',
-            click: () => parentWindow.webContents.send('scan-start')
+            click: () => startScan().catch(logActionFailure)
         },
         {
             label: 'Smart Cleanup',
-            click: () => parentWindow.webContents.send('cleanup-run', { type: 'smart' })
+            click: () => runCleanup('smart').catch(logActionFailure)
         },
         { type: 'separator' },
         {
@@ -144,21 +169,9 @@ app.whenReady().then(() => {
     startPythonBackend();
 
     // Expose Python API to JavaScript
-    ipcMain.handle('start-scan', async () => {
-        return fetch(`${BACKEND_URL}/api/v1/scan/start`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ drive: 'C:' })
-        }).then(res => res.json());
-    });
+    ipcMain.handle('start-scan', () => startScan());
 
-    ipcMain.handle('run-cleanup', async (event, { type }) => {
-        return fetch(`${BACKEND_URL}/api/v1/cleanup/run`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type })
-        }).then(res => res.json());
-    });
+    ipcMain.handle('run-cleanup', (event, { type }) => runCleanup(type));
 
     ipcMain.handle('get-usage-stats', async () => {
         return fetch(`${BACKEND_URL}/api/v1/usage/stats`)
