@@ -11,6 +11,8 @@
     <style>
         .reveal { opacity: 0; transform: translateY(30px); transition: all 0.8s ease; }
         .reveal.active { opacity: 1; transform: translateY(0); }
+        .dark body { color: #f5f5f5; }
+        .dark .text-neutral-500, .dark .text-neutral-600 { color: #d4d4d8; }
         @media (prefers-reduced-motion: reduce) {
             *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
             .reveal { opacity: 1; transform: none; }
@@ -73,22 +75,22 @@
                     </div>
                     
                     <div class="grid grid-cols-6 gap-2 h-64">
-                        <div class="treemap-item bg-blue-500 rounded-lg relative group" style="grid-row: span 3; grid-column: span 2;">
-                            <div class="absolute inset-0 flex items-center justify-center text-white font-bold text-sm opacity-0 group-hover:opacity-100 transition-opacity">Apps (89GB)</div>
+                        <div class="treemap-item bg-blue-500 rounded-lg relative group" style="grid-row: span 3; grid-column: span 2;" tabindex="0" role="img" aria-label="Applications - 89 GB" title="Applications - 89 GB">
+                            <div class="absolute inset-0 flex items-center justify-center text-white font-bold text-sm opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity">Apps (89GB)</div>
                         </div>
-                        <div class="treemap-item bg-green-500 rounded-lg" style="grid-row: span 2;">
-                            <div class="absolute inset-0 flex items-center justify-center text-white font-bold text-xs opacity-0 group-hover:opacity-100 transition-opacity">Videos (47GB)</div>
+                        <div class="treemap-item bg-green-500 rounded-lg" style="grid-row: span 2;" tabindex="0" role="img" aria-label="Videos - 47 GB" title="Videos - 47 GB">
+                            <div class="absolute inset-0 flex items-center justify-center text-white font-bold text-xs opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity">Videos (47GB)</div>
                         </div>
-                        <div class="treemap-item bg-purple-500 rounded-lg"></div>
-                        <div class="treemap-item bg-orange-500 rounded-lg"></div>
-                        <div class="treemap-item bg-red-500 rounded-lg"></div>
-                        <div class="treemap-item bg-teal-500 rounded-lg"></div>
-                        <div class="treemap-item bg-indigo-500 rounded-lg"></div>
-                        <div class="treemap-item bg-pink-500 rounded-lg"></div>
-                        <div class="treemap-item bg-yellow-500 rounded-lg"></div>
-                        <div class="treemap-item bg-cyan-500 rounded-lg"></div>
-                        <div class="treemap-item bg-lime-500 rounded-lg"></div>
-                        <div class="treemap-item bg-amber-500 rounded-lg"></div>
+                        <div class="treemap-item bg-purple-500 rounded-lg" tabindex="0" role="img" aria-label="Documents - 31 GB" title="Documents - 31 GB"></div>
+                        <div class="treemap-item bg-orange-500 rounded-lg" tabindex="0" role="img" aria-label="Images - 18 GB" title="Images - 18 GB"></div>
+                        <div class="treemap-item bg-red-500 rounded-lg" tabindex="0" role="img" aria-label="Music - 9 GB" title="Music - 9 GB"></div>
+                        <div class="treemap-item bg-teal-500 rounded-lg" tabindex="0" role="img" aria-label="Downloads - 6 GB" title="Downloads - 6 GB"></div>
+                        <div class="treemap-item bg-indigo-500 rounded-lg" tabindex="0" role="img" aria-label="System - 5 GB" title="System - 5 GB"></div>
+                        <div class="treemap-item bg-pink-500 rounded-lg" tabindex="0" role="img" aria-label="Other - 4 GB" title="Other - 4 GB"></div>
+                        <div class="treemap-item bg-yellow-500 rounded-lg" tabindex="0" role="img" aria-label="Archives - 3 GB" title="Archives - 3 GB"></div>
+                        <div class="treemap-item bg-cyan-500 rounded-lg" tabindex="0" role="img" aria-label="Backups - 2 GB" title="Backups - 2 GB"></div>
+                        <div class="treemap-item bg-lime-500 rounded-lg" tabindex="0" role="img" aria-label="Cache - 1 GB" title="Cache - 1 GB"></div>
+                        <div class="treemap-item bg-amber-500 rounded-lg" tabindex="0" role="img" aria-label="Temporary - 0.5 GB" title="Temporary - 0.5 GB"></div>
                     </div>
                 </div>
             </div>
@@ -206,7 +208,9 @@
         }
         
         window.addEventListener('load', () => {
-            if (localStorage.getItem('theme') === 'dark') {
+            const storedTheme = localStorage.getItem('theme');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (storedTheme === 'dark' || (!storedTheme && prefersDark)) {
                 document.documentElement.classList.add('dark');
             }
             checkReveal();

@@ -7,6 +7,7 @@
     <meta name="description" content="Review recorded disk scans, cleanup history and storage trends for EatUp Pro.">
     <link rel="icon" href="/favicon.ico" sizes="any">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>tailwind.config = { darkMode: 'class' };</script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -27,11 +28,14 @@
                 <div class="flex items-center">
                     <h1 class="text-xl font-bold text-blue-600 dark:text-blue-300">EatUp Pro Analytics</h1>
                 </div>
-                <button id="refreshButton" onclick="refreshData()" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60">
-                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                    Refresh Data
-                </button>
-                <button id="apiKeyButton" aria-label="Set API key" title="Set API key" class="ml-2 inline-flex items-center px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">🔑</button>
+                <div class="flex items-center gap-2">
+                    <button id="refreshButton" onclick="refreshData()" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        Refresh Data
+                    </button>
+                    <button id="apiKeyButton" aria-label="Set API key" title="Set API key" class="inline-flex items-center px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">🔑</button>
+                    <button id="themeToggleAnalytics" aria-label="Toggle dark mode" title="Toggle dark mode" class="inline-flex items-center px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">🌓</button>
+                </div>
             </div>
         </div>
     </nav>
@@ -156,6 +160,22 @@
     <script>
         // API Configuration
         const API_BASE = '/api/v1';
+
+        (function () {
+            const stored = localStorage.getItem('theme');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (stored === 'dark' || (!stored && prefersDark)) {
+                document.documentElement.classList.add('dark');
+            }
+            window.addEventListener('load', () => {
+                const button = document.getElementById('themeToggleAnalytics');
+                if (!button) return;
+                button.addEventListener('click', () => {
+                    const dark = document.documentElement.classList.toggle('dark');
+                    localStorage.setItem('theme', dark ? 'dark' : 'light');
+                });
+            });
+        })();
 
         (function () {
             const keyName = 'eatup_api_key';
