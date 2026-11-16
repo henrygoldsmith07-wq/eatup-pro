@@ -13,6 +13,9 @@
         body { font-family: 'Plus Jakarta Sans', sans-serif; }
         .fade-in { animation: fadeIn 0.5s ease-in; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+        }
     </style>
 </head>
 <body class="bg-gray-50 dark:bg-gray-900 min-h-screen">
@@ -24,7 +27,7 @@
                 <div class="flex items-center">
                     <h1 class="text-xl font-bold text-blue-600 dark:text-blue-300">EatUp Pro Analytics</h1>
                 </div>
-                <button onclick="refreshData()" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                <button id="refreshButton" onclick="refreshData()" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60">
                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                     Refresh Data
                 </button>
@@ -156,6 +159,13 @@
         let usageChart, pieChart;
         let hasScan = false;
 
+        // Chart.js draws on canvas, so Tailwind's dark classes cannot colour it.
+        const darkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (typeof Chart !== 'undefined' && darkMode) {
+            Chart.defaults.color = '#d1d5db';
+            Chart.defaults.borderColor = '#4b5563';
+        }
+
         function escapeHtml(value) {
             return String(value ?? '').replace(/[&<>"']/g, ch => ({
                 '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -181,35 +191,51 @@
         }
 
         async function fetchData() {
-            try {
-                const [stats, appStats, trends, scans, history, prediction, latest] = await Promise.all([
-                    getJson('/usage/stats'),
-                    getJson('/analytics/statistics'),
-                    getJson('/analytics/trends?days=90'),
-                    getJson('/analytics/scans?limit=30'),
-                    getJson('/analytics/cleanup-history?limit=20'),
-                    getJson('/ai/prediction'),
-                    getJson('/scan/latest').catch(() => null)
-                ]);
+            const refresh = document.getElementById('refreshButton');
+            const failed = [];
+            if (refresh) { refresh.disabled = true; refresh.textContent = 'Refreshing…'; }
 
-                document.getElementById('totalUsed').textContent = `${(stats.used_gb || 0).toFixed(1)} GB`;
-                document.getElementById('spaceFreed').textContent = fmtMb(appStats.total_space_saved_last_30_days_mb || appStats.total_space_freed_mb || 0);
-                document.getElementById('filesAnalyzed').textContent = latest ? (latest.files_scanned ?? 0).toLocaleString() : (appStats.total_scans || 0);
-                const growth = trends.data_points >= 2 ? trends.daily_growth_mb : null;
-                document.getElementById('growthRate').textContent = growth === null
-                    ? 'Not enough data'
-                    : `${Number(growth).toFixed(1)} MB/day`;
-
-                hasScan = Boolean(latest);
-                updateCharts(scans.scans || [], latest);
-                updateCleanupTable(history.cleanups || []);
-                updatePrediction(prediction);
-                updateRecommendations(latest, prediction, trends);
-                document.getElementById('dataError').classList.add('hidden');
-            } catch (error) {
-                console.error('Error fetching analytics:', error);
-                showDataError(error.message);
+            // Each section stands alone: one failing endpoint must not blank
+            // the whole dashboard.
+            async function section(path, fallback) {
+                try { return await getJson(path); }
+                catch (error) { console.error(path, error); failed.push(path); return fallback; }
             }
+
+            const [stats, appStats, trends, scans, history, prediction, latest] = await Promise.all([
+                section('/usage/stats', {}),
+                section('/analytics/statistics', {}),
+                section('/analytics/trends?days=90', { data_points: 0 }),
+                section('/analytics/scans?limit=30', { scans: [] }),
+                section('/analytics/cleanup-history?limit=20', { cleanups: [] }),
+                section('/ai/prediction', { available: false, message: 'Prediction data is unavailable.' }),
+                section('/scan/latest', null)
+            ]);
+
+            document.getElementById('totalUsed').textContent = stats.used_gb != null
+                ? `${Number(stats.used_gb).toFixed(1)} GB` : '-- GB';
+            document.getElementById('spaceFreed').textContent = fmtMb(
+                appStats.total_space_saved_last_30_days_mb || appStats.total_space_freed_mb || 0);
+            document.getElementById('filesAnalyzed').textContent = latest
+                ? (latest.files_scanned ?? 0).toLocaleString() : (appStats.total_scans || 0).toLocaleString();
+            const growth = trends.data_points >= 2 ? trends.daily_growth_mb : null;
+            document.getElementById('growthRate').textContent = growth == null
+                ? 'Not enough data' : `${Number(growth).toFixed(1)} MB/day`;
+
+            hasScan = Boolean(latest);
+            updateCharts(scans.scans || [], latest);
+            updateCleanupTable(history.cleanups || []);
+            updatePrediction(prediction);
+            updateRecommendations(latest, prediction, trends);
+
+            const banner = document.getElementById('dataError');
+            if (failed.length) {
+                banner.textContent = `Some sections could not be loaded: ${failed.join(', ')}. Other data is up to date.`;
+                banner.classList.remove('hidden');
+            } else {
+                banner.classList.add('hidden');
+            }
+            if (refresh) { refresh.disabled = false; refresh.textContent = 'Refresh Data'; }
         }
 
         function ensureCanvas(id) {

@@ -269,10 +269,13 @@
                 const catKeys = Object.keys(results.categories);
                 const catValues = Object.values(results.categories);
                 
+                const largest = Math.max(...catValues, 1);
                 catKeys.forEach((cat, i) => {
                     const size = catValues[i] || 0;
-                    const colSpan = Math.max(1, Math.floor(size / 5));
-                    const rowSpan = Math.max(1, Math.floor(size / 10));
+                    // Scale spans to the grid so a large category cannot create
+                    // implicit columns and break the fixed-height treemap.
+                    const colSpan = Math.max(1, Math.min(8, Math.ceil(size / largest * 8)));
+                    const rowSpan = Math.max(1, Math.min(4, Math.ceil(size / largest * 4)));
                     
                     const div = document.createElement('div');
                     div.className = `${colors[i % colors.length]} rounded-lg treemap-item relative group cursor-pointer hover:opacity-90 transition-opacity`;
