@@ -9,7 +9,14 @@
     {
       "src": "i18n/*.json",
       "use": "@vercel/static"
+    },
+    {
+      "src": "api/index.py",
+      "use": "@vercel/python"
     }
+  ],
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index.py" }
   ],
   "github": {
     "silent": true
