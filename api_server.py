@@ -8,6 +8,7 @@ import os
 import sys
 import hmac
 import json
+import math
 import time
 from dataclasses import asdict
 from datetime import datetime
@@ -174,7 +175,11 @@ def scan_start():
     data = request.json or {}
     drive = data.get('drive', 'C:')
     with_duplicates = data.get('find_duplicates', True)
-    
+    if not isinstance(drive, str) or not drive.strip() or len(drive) > 260:
+        return jsonify({'error': 'drive must be a non-empty path of at most 260 characters'}), 400
+    if not isinstance(with_duplicates, bool):
+        return jsonify({'error': 'find_duplicates must be a boolean'}), 400
+
     with scan_lock:
         running = next((sid for sid, job in scan_jobs.items() if job['status'] == 'running'), None)
         if running:
@@ -298,8 +303,20 @@ def cleanup_run():
     try:
         data = request.json or {}
         cleanup_type = data.get('type', 'smart')
-        dry_run = bool(data.get('dry_run', False))
-        
+        dry_run = data.get('dry_run', False)
+        if cleanup_type not in {'temp', 'duplicates', 'large', 'smart'}:
+            return jsonify({'error': f'Unknown cleanup type: {cleanup_type}'}), 400
+        if not isinstance(dry_run, bool):
+            return jsonify({'error': 'dry_run must be a boolean'}), 400
+        min_size = 1.0
+        if cleanup_type == 'large':
+            try:
+                min_size = float(data.get('min_size_gb', 1))
+            except (TypeError, ValueError):
+                return jsonify({'error': 'min_size_gb must be a number'}), 400
+            if not math.isfinite(min_size) or min_size <= 0:
+                return jsonify({'error': 'min_size_gb must be a positive finite number'}), 400
+
         cleaner_obj = get_cleaner()
         if is_scan_running():
             return jsonify({'error': 'Wait for the running scan to finish'}), 409
@@ -312,7 +329,6 @@ def cleanup_run():
         elif cleanup_type == 'duplicates':
             result = cleaner_obj.cleanup_duplicates(dry_run=dry_run)
         elif cleanup_type == 'large':
-            min_size = float(data.get('min_size_gb', 1))
             result = cleaner_obj.cleanup_large_files(min_size_gb=min_size, dry_run=dry_run)
         elif cleanup_type == 'smart':
             result = cleaner_obj.smart_cleanup(dry_run=dry_run)

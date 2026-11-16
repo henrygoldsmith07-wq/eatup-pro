@@ -65,6 +65,22 @@ def test_cleanup_requires_scan_and_json(client):
                        content_type="text/plain").status_code == 415
 
 
+def test_write_inputs_are_validated(client):
+    assert client.post("/api/v1/scan/start", json={"drive": ""}).status_code == 400
+    assert client.post("/api/v1/scan/start", json={"find_duplicates": "yes"}).status_code == 400
+
+    scan_id = client.post("/api/v1/scan/start", json={"drive": client.scan_root}).get_json()["scan_id"]
+    wait_for_scan(client, scan_id)
+    for body in (
+        {"type": "large", "min_size_gb": -1},
+        {"type": "large", "min_size_gb": "huge"},
+        {"type": "large", "min_size_gb": 0},
+        {"type": "unknown"},
+        {"type": "temp", "dry_run": "false"},
+    ):
+        assert client.post("/api/v1/cleanup/run", json=body).status_code == 400
+
+
 def test_cleanup_dry_run(client):
     scan_id = client.post("/api/v1/scan/start", json={"drive": client.scan_root}).get_json()["scan_id"]
     wait_for_scan(client, scan_id)
