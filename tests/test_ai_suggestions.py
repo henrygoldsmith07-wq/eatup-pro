@@ -76,6 +76,14 @@ def test_prediction_uses_supplied_trends():
     assert 'predicted_full_date' in summary
 
 
+def test_stale_paths_do_not_break_recommendations():
+    engine = AISuggestionEngine()
+    stale = [{'path': '/no/such/file.tmp', 'name': 'gone.tmp', 'size': 10}]
+    assert engine.generate_smart_recommendations({'temp_files': stale}) == []
+    assert engine.generate_smart_recommendations({'large_files': stale}) == []
+    assert 'error' in engine.analyze_file_for_safety(stale[0]['path'], {'size': 10})
+
+
 def test_analyze_file_for_safety_uses_real_stats(tmp_path):
     path = tmp_path / 'old.tmp'
     path.write_bytes(b'x' * 1024)

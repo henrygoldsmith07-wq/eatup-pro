@@ -108,7 +108,9 @@ class SchedulerManager:
         self.logs: List[ScheduledTaskLog] = []
         self.running = False
         self.scheduler_thread = None
-        
+        self._load_failed = False
+        self._lock = threading.RLock()
+
         # Load existing tasks
         self.load_tasks()
         self._load_logs()
@@ -137,11 +139,23 @@ class SchedulerManager:
                 print(f"Loaded {len(self.tasks)} scheduled tasks")
                 return True
         except Exception as e:
-            print(f"Error loading tasks: {e}")
+            self._load_failed = True
+            print(f"Error loading tasks: {e}; refusing to overwrite {self.config_file}")
             return False
-    
+
+    @staticmethod
+    def _atomic_write_json(path: str, payload, **kwargs) -> None:
+        """Write JSON without ever leaving a truncated config behind"""
+        temp_path = f"{path}.tmp"
+        with open(temp_path, 'w', encoding='utf-8') as f:
+            json.dump(payload, f, indent=2, **kwargs)
+        os.replace(temp_path, path)
+
     def save_tasks(self) -> bool:
         """Save tasks to configuration file"""
+        if self._load_failed:
+            print("Configuration could not be read; original file left untouched")
+            return False
         try:
             data = {}
             for task_id, task in self.tasks.items():
@@ -156,9 +170,8 @@ class SchedulerManager:
                 
                 data[task_id] = task_dict
             
-            with open(self.config_file, 'w') as f:
-                json.dump(data, f, indent=2)
-            
+            self._atomic_write_json(self.config_file, data)
+
             return True
         except Exception as e:
             print(f"Error saving tasks: {e}")
@@ -218,7 +231,12 @@ class SchedulerManager:
         return False
     
     def run_task(self, task_id: str) -> ScheduledTaskLog:
-        """Execute a single task manually"""
+        """Execute a single task manually, serialised with the scheduler thread"""
+        with self._lock:
+            return self._run_task_locked(task_id)
+
+    def _run_task_locked(self, task_id: str) -> ScheduledTaskLog:
+        """Execute a single task (caller must hold self._lock)"""
         if task_id not in self.tasks:
             raise ValueError(f"Task {task_id} not found")
         
@@ -311,6 +329,9 @@ class SchedulerManager:
     
     def start_scheduler(self):
         """Start the background scheduler thread"""
+        if self.running:
+            print("Scheduler is already running")
+            return
         if not SCHEDULE_AVAILABLE:
             print("Scheduler requires 'schedule' package. Install with: pip install schedule")
             return
@@ -391,8 +412,9 @@ class SchedulerManager:
     def _save_logs(self):
         """Save logs to file"""
         try:
-            with open(self._log_file, 'w') as f:
-                json.dump([asdict(log) for log in self.logs[-500:]], f, indent=2, default=str)
+            self._atomic_write_json(
+                self._log_file, [asdict(log) for log in self.logs[-500:]], default=str
+            )
         except Exception as e:
             print(f"Error saving logs: {e}")
     

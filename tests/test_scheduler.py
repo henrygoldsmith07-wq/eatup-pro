@@ -1,5 +1,7 @@
+import json
 import sys
 import xml.etree.ElementTree as ET
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 import pytest
@@ -46,6 +48,34 @@ def test_add_task_validates_input(tmp_path):
         manager.add_task("x", frequency="hourly")
     with pytest.raises(ValueError):
         manager.add_task("x", actions=["rm_rf"])
+
+
+def test_bad_config_does_not_destroy_saved_tasks(tmp_path):
+    config = tmp_path / "tasks.json"
+    manager = SchedulerManager(str(config))
+    first = manager.add_task("First", drive=str(tmp_path), actions=["scan"])
+    second = manager.add_task("Second", drive=str(tmp_path), actions=["scan"])
+
+    data = json.loads(config.read_text())
+    bad = dict(data[first], frequency="weekly", day_of_week="funday")
+    data["bad"] = bad
+    config.write_text(json.dumps(data))
+
+    reloaded = SchedulerManager(str(config))
+    assert reloaded._load_failed is True
+    reloaded.add_task("Third", drive=str(tmp_path), actions=["scan"])
+    on_disk = json.loads(config.read_text())
+    assert first in on_disk and second in on_disk  # originals were not truncated
+
+
+def test_concurrent_task_runs_keep_valid_files(tmp_path):
+    manager = SchedulerManager(str(tmp_path / "tasks.json"))
+    task_id = manager.add_task("Concurrent", drive=str(tmp_path), actions=["scan"])
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(lambda _: manager.run_task(task_id), range(2)))
+    assert all(log.status == "completed" for log in results)
+    assert len(manager.get_recent_logs()) == 2
+    assert json.loads((tmp_path / "tasks.json").read_text())[task_id]["id"] == task_id
 
 
 def test_windows_task_xml_is_valid(tmp_path, monkeypatch):

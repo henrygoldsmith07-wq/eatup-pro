@@ -199,6 +199,11 @@ class PluginRegistry:
         
     def register_plugin(self, plugin_instance: BasePlugin):
         """Register a new plugin"""
+        # Custom plugins are not required to call BasePlugin.__init__().
+        if getattr(plugin_instance, 'config', None) is None:
+            plugin_instance.config = {}
+        if not hasattr(plugin_instance, 'enabled'):
+            plugin_instance.enabled = True
         plugin_instance.plugin_id = f"{plugin_instance.metadata.name.lower().replace(' ', '_')}_{plugin_instance.metadata.version}"
         self.plugins[plugin_instance.plugin_id] = plugin_instance
         self.available_plugins.append(plugin_instance.metadata.name)

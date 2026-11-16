@@ -63,43 +63,11 @@ class CloudStorageManager:
         self.sync_folders = {}
         
     def authenticate_google_drive(self) -> bool:
-        """Authenticate with Google Drive API"""
-        if not GOOGLE_API_AVAILABLE:
-            return False
-            
-        try:
-            # Check for existing credentials
-            creds = None
-            if os.path.exists('token.json'):
-                creds = Flow.from_json_file(open('token.json'), 
-                                           scopes=['https://www.googleapis.com/auth/drive.readonly'])
-            
-            # If no valid credentials, show auth flow (simplified)
-            if not creds or not creds.valid:
-                if creds and creds.expired and creds.refresh_token:
-                    creds.refresh(Request())
-                else:
-                    # In production, open browser for OAuth
-                    print("Open this URL in browser and complete OAuth:")
-                    print("https://accounts.google.com/o/oauth2/v2/auth?client_id=YOUR_CLIENT_ID&redirect_uri=urn:ietf:wg:oauth:2.0:oob&scope=https://www.googleapis.com/auth/drive.readonly&access_type=offline")
-                    # Get code from user
-                    auth_code = input("Enter authorization code: ")
-                    # Exchange code for token (simplified)
-                    
-                # Save credentials
-                with open('token.json', 'w') as f:
-                    pass  # Save token here
-            
-            self.connected_services['google_drive'] = {
-                'status': 'connected',
-                'auth_flow': creds,
-                'connected_at': datetime.now()
-            }
-            return True
-            
-        except Exception as e:
-            print(f"Google Drive auth failed: {e}")
-            return False
+        """Authenticate with Google Drive API (OAuth exchange not implemented)"""
+        # There is no real client id/secret flow or token exchange in this
+        # repository, so claiming a successful connection would be false.
+        print("Google Drive authentication is not implemented in this build.")
+        return False
     
     def authenticate_dropbox(self, app_key: str, app_secret: str) -> bool:
         """Authenticate with Dropbox"""
@@ -284,12 +252,10 @@ class CloudStorageManager:
         """Download file from cloud storage"""
         try:
             if service == 'google_drive':
-                service_obj = self.connected_services['google_drive']
-                request = service_obj['auth_flow']  # Would need proper file export request
-                # Simplified implementation
-                print(f"Download requested: {file_id} -> {destination}")
-                return True
-                
+                print("Google Drive download is not implemented in this build.")
+                return False
+
+
             elif service == 'dropbox':
                 dbx = self.connected_services['dropbox']['client']
                 metadata, response = dbx.files_download(path=f'/{file_id}')
@@ -307,10 +273,10 @@ class CloudStorageManager:
         """Upload file to cloud storage"""
         try:
             if service == 'google_drive':
-                # Implement upload logic
-                print(f"Upload requested: {source_path} -> {dest_path}")
-                return True
-                
+                print("Google Drive upload is not implemented in this build.")
+                return False
+
+
             elif service == 'dropbox':
                 dbx = self.connected_services['dropbox']['client']
                 with open(source_path, 'rb') as f:
@@ -348,8 +314,8 @@ def main():
     
     # Show supported services
     print("Supported Services:")
-    print("  ✓ Google Drive")
-    print("  ✓ Dropbox")
+    print("  ⚠ Google Drive (not implemented)")
+    print("  ⚠ Dropbox (demo helper only)")
     print("  ⏳ OneDrive (coming soon)")
     print()
     

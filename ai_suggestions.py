@@ -60,9 +60,20 @@ class AISuggestionEngine:
     def analyze_file_for_safety(self, filepath: str, stats: Dict[str, Any]) -> Dict[str, Any]:
         """Analyze single file for deletion safety"""
         
-        # Extract features
-        features = self._extract_features(filepath, stats)
-        
+        # Files recorded in a scan can disappear before analysis
+        try:
+            features = self._extract_features(filepath, stats)
+        except OSError as exc:
+            return {
+                'filepath': filepath,
+                'error': str(exc),
+                'recommendation': Recommendation(
+                    confidence=0.0, priority='low', action='keep',
+                    reason='File is no longer available on disk',
+                    files_involved=[], potential_savings_mb=0, risk_level='risky'
+                )
+            }
+
         # Calculate safety score
         safety_score = self._calculate_safety_score(features)
         
@@ -230,9 +241,9 @@ class AISuggestionEngine:
                 )
                 results.append(result)
             except Exception as e:
-                print(f"Error analyzing {file_info['path']}: {e}")
+                print(f"Error analyzing {file_info.get('path', '<missing path>')}: {e}")
         
-        return sorted(results, key=lambda x: x['safety_score'], reverse=True)
+        return sorted(results, key=lambda x: x.get('safety_score', 0), reverse=True)
     
     def generate_smart_recommendations(self, scan_results: Dict[str, Any]) -> List[Recommendation]:
         """Generate comprehensive smart cleanup recommendations"""
@@ -270,6 +281,8 @@ class AISuggestionEngine:
                 {'size': temp_file.get('size', 0)}
             )
             
+            if 'error' in analysis:
+                continue
             if analysis['safety_score'] > 0.7:
                 rec = Recommendation(
                     confidence=analysis['safety_score'],
@@ -315,6 +328,8 @@ class AISuggestionEngine:
                 {'size': large_file.get('size', 0)}
             )
             
+            if 'error' in analysis:
+                continue
             if analysis['safety_score'] < 0.6:  # Higher risk
                 rec = Recommendation(
                     confidence=analysis['safety_score'],

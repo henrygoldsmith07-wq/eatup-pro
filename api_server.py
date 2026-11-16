@@ -231,6 +231,7 @@ def run_scan(scan_id, drive, with_duplicates):
             'status': 'complete'
         }, duration=duration)
         job['status'] = 'complete'
+        job['files_scanned'] = results.files_scanned
         latest_scan_id = scan_id
     except Exception as e:
         job['status'] = 'failed'
@@ -256,7 +257,7 @@ def scan_status(scan_id):
         'scan_id': scan_id,
         'status': job['status'],
         'progress': 100 if job['status'] == 'complete' else None,
-        'files_scanned': get_cleaner().files_scanned,
+        'files_scanned': job.get('files_scanned', 0),
         'message': messages[job['status']]
     })
 
@@ -704,10 +705,13 @@ def ai_analyze():
         if files is not None:
             if not isinstance(files, list):
                 return jsonify({'error': 'files must be a list'}), 400
-            analyses = engine.batch_analyze_files(files)
+            all_analyses = engine.batch_analyze_files(files)
+            skipped = sum(1 for item in all_analyses if 'error' in item)
+            analyses = [item for item in all_analyses if 'error' not in item]
             recommendations = [a['recommendation'] for a in analyses]
             return jsonify({
                 'count': len(analyses),
+                'skipped': skipped,
                 'analyses': analyses,
                 'recommendations': [asdict(r) for r in recommendations]
             })

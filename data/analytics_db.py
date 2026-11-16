@@ -338,9 +338,22 @@ class AnalyticsDatabase:
         days_span = (datetime.fromisoformat(last_scan['timestamp']).timestamp() -
                     datetime.fromisoformat(first_scan['timestamp']).timestamp()) / 86400
         
+        if days_span < 1:
+            # Scans closer than a day cannot support a daily rate; treating a
+            # one-second gap as a full day fabricates dramatic growth.
+            return {
+                'daily_growth_mb': 0,
+                'weekly_growth_mb': 0,
+                'monthly_growth_mb': 0,
+                'trend_direction': 'stable',
+                'average_utilization': round(
+                    sum(s['utilization_percent'] for s in scans) / len(scans), 2),
+                'data_points': len(scans)
+            }
+
         used_delta = (last_scan['total_used_bytes'] - first_scan['total_used_bytes']) / (1024**2)
         
-        daily_growth = used_delta / max(1, days_span)
+        daily_growth = used_delta / days_span
         weekly_growth = daily_growth * 7
         monthly_growth = daily_growth * 30
         

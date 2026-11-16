@@ -1,4 +1,5 @@
 import time
+import uuid
 
 import pytest
 
@@ -126,6 +127,14 @@ def test_ai_analyze_uses_the_engine(client):
     assert "confidence_score" not in body  # no hardcoded placeholder value
 
 
+def test_ai_analyze_reports_skipped_missing_paths(client):
+    body = client.post("/api/v1/ai/analyze", json={
+        "files": [{"path": "/no/such/file.tmp", "size": 10}]
+    }).get_json()
+    assert body["count"] == 0
+    assert body["skipped"] == 1
+
+
 def test_ai_analyze_without_files_needs_a_scan(client):
     assert client.post("/api/v1/ai/analyze", json={}).status_code == 404
 
@@ -153,6 +162,20 @@ def test_schedule_run_is_backgrounded(client, monkeypatch, tmp_path):
     assert job["status"] == "completed", job
     assert client.get("/api/v1/schedule/jobs/unknown").status_code == 404
     assert client.post("/api/v1/schedule/missing/run", json={}).status_code == 404
+
+
+def test_closely_spaced_scans_do_not_fabricate_growth(tmp_path):
+    db = AnalyticsDatabase(tmp_path / "trends.db")
+    for used in (100 * 1024 ** 2, 200 * 1024 ** 2):
+        db.save_scan({
+            'scan_id': str(uuid.uuid4()), 'drive': 'C:',
+            'total_used_bytes': used, 'total_space_bytes': 1024 ** 3,
+            'utilization_percent': 10, 'categories_json': '{}',
+            'status': 'complete'
+        })
+    trends = db.calculate_trends(days=1)
+    assert trends['trend_direction'] == 'stable'
+    assert trends['daily_growth_mb'] == 0
 
 
 def test_cloud_files_and_stats_are_not_implemented(client):
