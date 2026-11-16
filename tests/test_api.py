@@ -10,6 +10,7 @@ from data.analytics_db import AnalyticsDatabase
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     monkeypatch.setattr(cleaner, "ROOT_TEMP_DIRS", set())
+    monkeypatch.setattr(cleaner, "TEMP_LOCATIONS", ())
     monkeypatch.setattr(api_server, "cleaner", None)
     monkeypatch.setattr(api_server, "db", AnalyticsDatabase(tmp_path / "test.db"))
     monkeypatch.setattr(api_server, "scan_jobs", {})
@@ -85,3 +86,34 @@ def test_export_and_analytics(client):
     assert client.get("/api/v1/export/report").status_code == 404
     assert client.get("/api/v1/analytics/statistics").status_code == 200
     assert client.get("/api/v1/analytics/trends").get_json()["data_points"] == 0
+
+
+def test_ai_analyze_uses_the_engine(client):
+    body = client.post("/api/v1/ai/analyze", json={
+        "files": [{"path": f"{client.scan_root}/note.txt", "size": 5}]
+    }).get_json()
+    assert body["count"] == 1
+    assert 0 <= body["analyses"][0]["safety_score"] <= 1
+    assert body["recommendations"][0]["risk_level"] in {"safe", "moderate", "risky"}
+    assert "confidence_score" not in body  # no hardcoded placeholder value
+
+
+def test_ai_analyze_without_files_needs_a_scan(client):
+    assert client.post("/api/v1/ai/analyze", json={}).status_code == 404
+
+
+def test_cloud_connect_is_not_implemented(client):
+    for service in ("google-drive", "dropbox"):
+        response = client.post(f"/api/v1/cloud/connect/{service}", json={})
+        assert response.status_code == 501
+        assert response.get_json()["error"] == "Not implemented"
+
+
+def test_nonlocal_writes_require_api_key(client, monkeypatch):
+    remote = {"REMOTE_ADDR": "8.8.8.8"}
+    assert client.post("/api/v1/cleanup/run", json={"type": "temp"},
+                       environ_base=remote).status_code == 403
+    monkeypatch.setenv("API_KEY", "secret")
+    assert client.post("/api/v1/cleanup/run", json={"type": "temp"},
+                       environ_base=remote,
+                       headers={"X-API-Key": "secret"}).status_code == 400  # no scan yet

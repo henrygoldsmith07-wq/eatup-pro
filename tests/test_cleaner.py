@@ -37,8 +37,11 @@ def test_drive_root():
 
 @pytest.fixture
 def tree(tmp_path, monkeypatch):
-    # pytest's tmp_path lives under /tmp, which the scanner treats as a root temp dir
+    # pytest's tmp_path lives under /tmp (or AppData\Local\Temp on Windows),
+    # which the scanner treats as temp. Neutralise both temp path rules so the
+    # fixture files are classified by their own names/extensions.
     monkeypatch.setattr(cleaner, "ROOT_TEMP_DIRS", set())
+    monkeypatch.setattr(cleaner, "TEMP_LOCATIONS", ())
     monkeypatch.setattr(cleaner, "DUPLICATE_MIN_BYTES", 1)
     old = time.time() - 3 * 86400
 
@@ -114,6 +117,24 @@ def test_cleanup_skips_files_modified_since_scan(tree, monkeypatch):
     c.scan_drive(str(tree))
     (tree / "work/old.tmp").write_bytes(b"now in use, bigger")
     assert c.cleanup_temp_files().files_deleted == 0
+
+
+def test_cleanable_size_tracks_completed_cleanup(tree, monkeypatch):
+    def fake_recycle(path):
+        os.remove(path)
+
+    monkeypatch.setattr(cleaner, "move_to_recycle_bin", fake_recycle)
+    c = EatUpCleaner()
+    c.scan_drive(str(tree))
+    c.find_duplicates()
+    assert c.scan_results.cleanable_size == 22  # 10 bytes temp + 12 duplicate
+
+    assert c.cleanup_temp_files().files_deleted == 1
+    assert c.scan_results.cleanable_size == 12
+    assert c.cleanup_duplicates().files_deleted == 1
+    assert c.scan_results.cleanable_size == 0
+    assert c.cleanup_temp_files().files_deleted == 0
+    assert c.scan_results.cleanable_size == 0
 
 
 def test_delete_errors_are_reported(tree, monkeypatch):

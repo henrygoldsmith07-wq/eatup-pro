@@ -2,7 +2,7 @@
 
 A modern, powerful disk space analyzer and cleanup tool for Windows. Analyze your storage, find duplicates, remove temporary files, and reclaim valuable space safely.
 
-**Latest Version**: v1.1.0 with **real duplicate detection**, **enhanced AI suggestions**, and **production-ready deployment configuration**
+**Latest Version**: v1.2.0 with **real duplicate detection**, **suggestion engine wired into the API**, and **production-ready deployment configuration**
 
 ## 🌟 Features
 
@@ -104,6 +104,12 @@ After scanning, you'll see:
 ✅ **Dry Run Mode** - Preview what will be deleted before committing  
 ✅ **No Permanent Loss** - Restore any deleted file from Recycle Bin  
 ✅ **System File Protection** - Skips critical system files automatically  
+
+## ⚠️ Current Limitations
+
+- Cloud storage connect endpoints (`/api/v1/cloud/connect/*`) return HTTP 501: `cloud_storage.py` is a CLI demo, not a working OAuth integration. The docs in `ADVANCED_FEATURES.md` and `FEATURES_SUMMARY.md` describe an intended design, not shipped behavior.
+- AI analysis (`/api/v1/ai/analyze`) uses a simple weighted heuristic in `ai_suggestions.py`, not a trained model. It advises; it never deletes on its own.
+- The API server is a local tool. Set `API_KEY` before binding to a non-loopback `HOST`; without a key, destructive endpoints reject non-local callers.
 
 ## 🗂️ File Categories
 

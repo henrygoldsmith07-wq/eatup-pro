@@ -93,9 +93,9 @@ class AISuggestionEngine:
         mtime = datetime.fromtimestamp(stat_info.st_mtime)
         age_days = (datetime.now() - mtime).days
         
-        # Extension entropy (higher = more complex/rare)
+        # Extension "entropy" as a bounded 0-1 signal for the scoring model
         ext = path_obj.suffix.lower()
-        entropy = len(ext) / 4  # Simplified entropy calculation
+        entropy = min(1.0, len(ext) / 4)
         
         # Path depth
         depth = len(path_obj.parts)
@@ -122,31 +122,29 @@ class AISuggestionEngine:
         )
     
     def _calculate_safety_score(self, features: AIFeature) -> float:
-        """Calculate overall safety score (0-1, higher = safer to delete)"""
+        """Calculate overall safety score (0-1, higher = safer to delete).
+
+        This is a weighted average: each signal is scaled by its weight and the
+        sum is divided by the total weight that actually applied, not by the
+        number of signals. Averaging by count capped the score well below 1 and
+        made every deletion threshold unreachable.
+        """
         weights = self.model_weights
-        
-        scores = []
-        
-        # Age component: old files are safer
-        age_score = min(1.0, features.file_age_days / 365)
-        scores.append(age_score * weights['age_weight'])
-        
-        # Frequency component: rarely accessed files are safer
-        freq_score = features.access_frequency
-        scores.append((1 - freq_score) * weights['frequency_weight'])
-        
-        # Category risk: already calculated risk
-        scores.append((1 - features.category_risk) * weights['category_weight'])
-        
-        # Temp penalty: temp-like files get boost
+
+        components = [
+            (min(1.0, features.file_age_days / 365), weights['age_weight']),
+            (1 - features.access_frequency, weights['frequency_weight']),
+            (1 - features.category_risk, weights['category_weight']),
+            (features.ext_entropy, weights['extension_safety']),
+        ]
         if features.is_temp_like:
-            scores.append(weights['temp_penalty'])
-        
-        # Extension safety
-        ext_safety = features.ext_entropy * weights['extension_safety']
-        scores.append(ext_safety)
-        
-        return sum(scores) / len(scores)
+            components.append((1.0, weights['temp_penalty']))
+
+        total_weight = sum(weight for _, weight in components)
+        if total_weight <= 0:
+            return 0.0
+        score = sum(value * weight for value, weight in components) / total_weight
+        return max(0.0, min(1.0, score))
     
     def _calculate_category_risk(self, path_obj: Path, ext: str) -> float:
         """Calculate risk score based on file category (0=low risk, 1=high risk)"""
@@ -179,9 +177,16 @@ class AISuggestionEngine:
         return 0.6  # Default risk
     
     def _generate_recommendation(self, safety_score: float, features: AIFeature) -> Recommendation:
-        """Generate recommendation based on safety score"""
-        
-        if safety_score > 0.8:
+        """Generate recommendation based on safety score.
+
+        A high score alone is not enough to recommend deletion: files in a
+        high-risk category (Documents, Program Files, Windows) stay in review
+        so a normalised score cannot turn user data into a delete suggestion.
+        """
+        review_threshold = self.model_weights.get('review_threshold', 0.5)
+        safe_target = features.is_temp_like or features.category_risk <= 0.4
+
+        if safety_score > 0.8 and safe_target:
             return Recommendation(
                 confidence=min(1.0, safety_score),
                 priority='high',
@@ -191,15 +196,16 @@ class AISuggestionEngine:
                 potential_savings_mb=features.file_size_mb,
                 risk_level='safe'
             )
-        elif safety_score > 0.5:
+        elif safety_score > review_threshold:
             return Recommendation(
                 confidence=safety_score,
-                priority='medium',
+                priority='medium' if safe_target else 'low',
                 action='review',
-                reason='Moderate safety: Review before deleting',
+                reason=('High score but category needs a human check'
+                        if not safe_target else 'Moderate safety: Review before deleting'),
                 files_involved=[],
                 potential_savings_mb=features.file_size_mb,
-                risk_level='moderate'
+                risk_level='moderate' if safe_target else 'risky'
             )
         else:
             return Recommendation(

@@ -9,6 +9,7 @@ import sys
 import hmac
 import json
 import time
+from dataclasses import asdict
 from datetime import datetime
 from flask import Flask, request, jsonify, send_from_directory, abort
 from flask_cors import CORS
@@ -23,6 +24,7 @@ sys.path.append(BASE_DIR)
 from cleaner import EatUpCleaner, CleanupResult, GB
 from scheduler import SchedulerManager
 from cloud_storage import CloudStorageManager
+from ai_suggestions import AISuggestionEngine
 from data.analytics_db import AnalyticsDatabase
 
 API_VERSION = '1.2.0'
@@ -43,6 +45,7 @@ if cors_origins:
 cleaner = None
 scheduler = None
 cloud_manager = None
+ai_engine = None
 db = None
 
 # Scan jobs: scan_id -> {'status', 'drive', 'error', 'started_at', 'finished_at'}
@@ -83,6 +86,14 @@ def get_db():
     return db
 
 
+def get_ai_engine():
+    """Lazy initialization of the suggestion engine"""
+    global ai_engine
+    if ai_engine is None:
+        ai_engine = AISuggestionEngine()
+    return ai_engine
+
+
 @app.before_request
 def reject_foreign_hosts():
     """Block DNS-rebinding attacks while bound to loopback"""
@@ -105,8 +116,13 @@ def require_auth(f):
     def decorated(*args, **kwargs):
         expected = os.getenv('API_KEY')
         api_key = request.headers.get('X-API-Key', '')
-        if expected and not hmac.compare_digest(api_key, expected):
-            return jsonify({'error': 'Unauthorized'}), 401
+        if expected:
+            if not hmac.compare_digest(api_key, expected):
+                return jsonify({'error': 'Unauthorized'}), 401
+        elif request.remote_addr not in LOCAL_HOSTNAMES:
+            # Without a configured key, destructive endpoints must stay local
+            # even when HOST exposes the server on a network interface.
+            return jsonify({'error': 'API_KEY is required for non-local requests'}), 403
         if request.method == 'POST' and not request.is_json:
             return jsonify({'error': 'Content-Type must be application/json'}), 415
         return f(*args, **kwargs)
@@ -400,49 +416,30 @@ def schedule_run(task_id):
 
 # ==================== CLOUD STORAGE ====================
 
+# Cloud connections are not available through the REST API: the providers need
+# real OAuth credentials and an interactive redirect flow, which cloud_storage
+# does not implement (its CLI demo uses input() and a placeholder client ID).
+# Returning 501 is honest and avoids blocking a request thread on stdin.
+CLOUD_UNAVAILABLE = {
+    'error': 'Not implemented',
+    'message': ('Cloud storage connections are unavailable over the REST API. '
+                'cloud_storage.py is a CLI demo only; configure OAuth credentials '
+                'and an interactive flow before exposing a connect endpoint.')
+}
+
+
 @app.route('/api/v1/cloud/connect/google-drive', methods=['POST'])
 @require_auth
 def cloud_connect_google_drive():
-    """Connect to Google Drive"""
-    try:
-        cloud_manager = get_cloud_manager()
-        
-        # Return OAuth URL
-        auth_url = "https://accounts.google.com/o/oauth2/v2/auth?client_id=YOUR_CLIENT_ID&redirect_uri=urn:ietf:wg:oauth:2.0:oob&scope=https://www.googleapis.com/auth/drive.readonly&access_type=offline"
-        
-        return jsonify({
-            'status': 'auth_required',
-            'auth_url': auth_url,
-            'message': 'Please complete OAuth flow and provide authorization code'
-        })
-    
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    """Google Drive connect is not implemented; do not fake an OAuth URL."""
+    return jsonify(CLOUD_UNAVAILABLE), 501
 
 
 @app.route('/api/v1/cloud/connect/dropbox', methods=['POST'])
 @require_auth
 def cloud_connect_dropbox():
-    """Connect to Dropbox"""
-    try:
-        data = request.json or {}
-        app_key = data.get('app_key')
-        app_secret = data.get('app_secret')
-        
-        cloud_manager = get_cloud_manager()
-        
-        success = cloud_manager.authenticate_dropbox(app_key, app_secret)
-        
-        if success:
-            return jsonify({
-                'status': 'connected',
-                'service': 'dropbox'
-            })
-        else:
-            return jsonify({'error': 'Authentication failed'}), 401
-    
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    """Dropbox connect is not implemented; do not block on input()."""
+    return jsonify(CLOUD_UNAVAILABLE), 501
 
 
 @app.route('/api/v1/cloud/files', methods=['GET'])
@@ -602,31 +599,46 @@ def export_report():
 @app.route('/api/v1/ai/analyze', methods=['POST'])
 @require_auth
 def ai_analyze():
-    """AI-powered analysis of scan results"""
+    """Analyze explicit files, or the latest scan, with the suggestion engine"""
     try:
         data = request.json or {}
-        
-        # Placeholder for AI analysis
-        analysis = {
-            'confidence_score': 0.85,
-            'risk_assessment': 'low',
-            'recommendations': [
-                {
-                    'type': 'delete_temp_files',
-                    'confidence': 0.95,
-                    'reason': 'Safe to remove temporary files'
-                },
-                {
-                    'type': 'review_duplicates',
-                    'confidence': 0.72,
-                    'reason': 'Some duplicates may be important backups'
-                }
+        engine = get_ai_engine()
+
+        files = data.get('files')
+        if files is not None:
+            if not isinstance(files, list):
+                return jsonify({'error': 'files must be a list'}), 400
+            analyses = engine.batch_analyze_files(files)
+            recommendations = [a['recommendation'] for a in analyses]
+            return jsonify({
+                'count': len(analyses),
+                'analyses': analyses,
+                'recommendations': [asdict(r) for r in recommendations]
+            })
+
+        results = get_cleaner().scan_results
+        if results is None:
+            return jsonify({'error': 'Run a scan before requesting analysis'}), 404
+
+        scan_payload = {
+            'temp_files': [
+                {'path': f.path, 'name': f.name, 'size': f.size}
+                for f in results.temp_files
             ],
-            'anomalies_detected': []
+            'duplicates': [
+                [{'path': f.path, 'size': f.size} for f in group]
+                for group in results.duplicates
+            ],
+            'large_files': [
+                {'path': f.path, 'size': f.size} for f in results.large_files
+            ],
         }
-        
-        return jsonify(analysis)
-    
+        recommendations = engine.generate_smart_recommendations(scan_payload)
+        return jsonify({
+            'count': len(recommendations),
+            'recommendations': [asdict(r) for r in recommendations]
+        })
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -653,7 +665,13 @@ def main():
     print(f"Starting EatUp Pro API Server on {HOST}:{port}")
     print(f"App: http://localhost:{port}/app.html")
     print(f"Health check: http://localhost:{port}/api/v1/health")
-    
+    if not os.getenv('API_KEY'):
+        if HOST not in ('127.0.0.1', 'localhost', '::1'):
+            print("WARNING: API_KEY is unset. Destructive endpoints will reject "
+                  "non-local callers; set API_KEY before exposing this server.")
+        else:
+            print("Note: API_KEY is unset. Set it to require X-API-Key on writes.")
+
     app.run(host=HOST, port=port, debug=debug)
 
 

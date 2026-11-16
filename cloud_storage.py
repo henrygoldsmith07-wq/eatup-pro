@@ -251,11 +251,19 @@ class CloudStorageManager:
                 except Exception as e:
                     print(f"Error getting stats for {service}: {e}")
         
-        # Estimate Google Drive quota (15GB free tier)
-        estimated_total = 15 * 1024**3  # 15 GB
+        # Do not invent a 15 GB quota when nothing is connected: the API's
+        # cloud/stats endpoint would otherwise report fake capacity.
+        if not services:
+            return CloudStorageStats(
+                total_space=0, used_space=0, free_space=0,
+                utilization_percent=0, file_count=0, services_connected=[]
+            )
+
+        # Estimate Google Drive quota (15GB free tier) only when connected
+        estimated_total = 15 * 1024**3 if 'google_drive' in self.connected_services else total_size
         used = total_size
         free = estimated_total - used
-        
+
         return CloudStorageStats(
             total_space=estimated_total,
             used_space=used,

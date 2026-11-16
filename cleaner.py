@@ -71,6 +71,9 @@ class ScanResult:
     cleanable_size: int
     drive: str = 'C:'
     files_scanned: int = 0
+    # Full temp total, including files beyond the capped temp_files list. Kept
+    # separately so cleanable_size stays correct after cleanup or duplicate scans.
+    temp_cleanable_bytes: int = 0
 
 
 @dataclass
@@ -145,6 +148,7 @@ class EatUpCleaner:
 
         large_files.sort(key=lambda f: f.size, reverse=True)
         temp_files.sort(key=lambda f: f.size, reverse=True)
+        temp_total = sum(f.size for f in temp_files)
 
         self.scan_results = ScanResult(
             total_used=usage.used,
@@ -153,9 +157,10 @@ class EatUpCleaner:
             large_files=large_files[:100],  # Keep the 100 largest
             duplicates=[],  # Filled by find_duplicates()
             temp_files=temp_files[:500],  # Keep the 500 largest
-            cleanable_size=sum(f.size for f in temp_files),
+            cleanable_size=temp_total,
             drive=drive,
-            files_scanned=self.files_scanned
+            files_scanned=self.files_scanned,
+            temp_cleanable_bytes=temp_total
         )
 
         print(f"\n✅ Scan complete! Found {self.files_scanned} files")
@@ -268,12 +273,18 @@ class EatUpCleaner:
                     duplicates.append(dup_files)
 
         self.scan_results.duplicates = duplicates
-        self.scan_results.cleanable_size = (
-            sum(f.size for f in self.scan_results.temp_files) + self.duplicate_bytes()
-        )
+        self._refresh_cleanable_size()
 
         print(f"✅ Found {len(duplicates)} duplicate groups ({hashes_computed} hashes computed)")
         return duplicates
+
+    def _refresh_cleanable_size(self):
+        """Recompute cleanable space from the tracked temp total and live duplicates"""
+        if self.scan_results is None:
+            return
+        self.scan_results.cleanable_size = (
+            self.scan_results.temp_cleanable_bytes + self.duplicate_bytes()
+        )
 
     def duplicate_bytes(self) -> int:
         """Bytes reclaimable by keeping one copy of each duplicate group"""
@@ -333,6 +344,10 @@ class EatUpCleaner:
         result = self._recycle_files(self.scan_results.temp_files, dry_run)
         if not dry_run:
             self.scan_results.temp_files = self._remaining(self.scan_results.temp_files)
+            self.scan_results.temp_cleanable_bytes = max(
+                0, self.scan_results.temp_cleanable_bytes - result.freed_bytes
+            )
+            self._refresh_cleanable_size()
 
         print(f"✅ Freed {result.freed_bytes / GB:.2f} GB ({result.files_deleted} files)")
         return result
@@ -357,6 +372,7 @@ class EatUpCleaner:
                 group for group in (self._remaining(g) for g in self.scan_results.duplicates)
                 if len(group) > 1
             ]
+            self._refresh_cleanable_size()
 
         print(f"✅ Freed {result.freed_bytes / GB:.2f} GB ({result.files_deleted} files)")
         return result
