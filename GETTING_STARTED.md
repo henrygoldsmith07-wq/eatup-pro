@@ -1,6 +1,6 @@
 # EatUp Pro - Advanced Features Quick Start 🚀
 
-Complete guide to using all advanced features in EatUp Pro.
+Guide to the advanced features in EatUp Pro. Cloud storage sections describe a CLI demo only: the REST connect endpoints return HTTP 501 and no OAuth flow ships with this repository. See README → Current Limitations.
 
 ## Table of Contents
 - [Installation](#installation)
