@@ -36,6 +36,14 @@ def wait_for_scan(client, scan_id):
     pytest.fail("scan did not finish")
 
 
+def test_security_headers_are_present(client):
+    response = client.get("/app.html")
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
+    assert response.headers["X-Frame-Options"] == "DENY"
+    assert response.headers["Referrer-Policy"] == "no-referrer"
+    assert "default-src 'self'" in response.headers["Content-Security-Policy"]
+
+
 def test_health_and_ui(client):
     assert client.get("/api/v1/health").get_json()["status"] == "healthy"
     assert client.get("/app.html").status_code == 200

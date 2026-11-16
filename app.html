@@ -56,6 +56,7 @@
                 <button onclick="scanDrive()" class="text-neutral-600 dark:text-neutral-400 hover:text-brand-500 font-medium">Scan Drive</button>
                 <button onclick="showSection('storage')" class="text-neutral-600 dark:text-neutral-400 hover:text-brand-500 font-medium">Storage</button>
                 <button onclick="showSection('cleanup')" class="text-neutral-600 dark:text-neutral-400 hover:text-brand-500 font-medium">Cleanup</button>
+                <button id="apiKeyButton" aria-label="Set API key" title="Set API key" class="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800">🔑</button>
                 <button id="themeToggle" aria-label="Toggle dark mode" class="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800">
                     <svg class="w-5 h-5 dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
                     <svg class="w-5 h-5 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
@@ -428,6 +429,37 @@
         // opened directly from disk, and must be labelled as such.
         const API_BASE_URL = '/api/v1';
         const DEMO_MODE = location.protocol === 'file:';
+
+        // When API_KEY is enabled the UI needs to send it. Keep the key in
+        // session storage so it is never written to a file or shared elsewhere.
+        (function () {
+            const keyName = 'eatup_api_key';
+            const nativeFetch = window.fetch.bind(window);
+            window.fetch = function (input, init) {
+                const url = typeof input === 'string' ? input : (input && input.url) || '';
+                const key = sessionStorage.getItem(keyName);
+                if (url.indexOf('/api/v1/') !== -1 && key) {
+                    init = init || {};
+                    const headers = new Headers(init.headers || {});
+                    headers.set('X-API-Key', key);
+                    init.headers = headers;
+                }
+                return nativeFetch(input, init);
+            };
+            window.addEventListener('load', () => {
+                const button = document.getElementById('apiKeyButton');
+                if (!button) return;
+                button.addEventListener('click', () => {
+                    const current = sessionStorage.getItem(keyName) || '';
+                    const entered = window.prompt('Local EatUp API key (blank to clear):', current);
+                    if (entered === null) return;
+                    if (entered.trim()) sessionStorage.setItem(keyName, entered.trim());
+                    else sessionStorage.removeItem(keyName);
+                    button.title = sessionStorage.getItem(keyName) ? 'API key set' : 'Set API key';
+                });
+            });
+        })();
+
         let lastScanResults = null;
 
         function setProgress(value) {
