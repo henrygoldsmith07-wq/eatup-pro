@@ -1,102 +1,89 @@
-const { app, BrowserWindow, ipcMain, Menu, Tray, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const { spawn } = require('child_process');
-const http = require('http');
 let pythonProcess = null;
-let mainWindow = null;
+let tray = null;
+
+const PORT = process.env.PORT || 5000;
+const PYTHON = process.env.PYTHON || 'python';
+const BACKEND_URL = `http://127.0.0.1:${PORT}`;
+const PROJECT_ROOT = path.join(__dirname, '..');
 
 // Python backend process
 function startPythonBackend() {
-    const port = process.env.PORT || 5000;
-    
-    // Set environment variables
-    const env = { ...process.env };
-    
-    pythonProcess = spawn('python', ['api_server.py'], {
-        cwd: __dirname + '/../',
-        env: env
+    pythonProcess = spawn(PYTHON, ['api_server.py'], {
+        cwd: PROJECT_ROOT,
+        env: { ...process.env, PORT: PORT }
     });
 
     pythonProcess.stdout.on('data', (data) => {
-        console.log(`[Python Backend]: ${data}`);
-        
-        // Check if server is ready
-        if (data.toString().includes('Starting EatUp Pro API Server')) {
-            console.log('✅ Python backend started successfully');
-        }
+        console.log(`Python Backend: ${data}`);
     });
 
     pythonProcess.stderr.on('data', (data) => {
-        console.error(`[Python Error]: ${data}`);
-    });
-
-    pythonProcess.on('close', (code) => {
-        console.log(`Python backend exited with code ${code}`);
+        console.error(`Python Error: ${data}`);
     });
 }
 
-// Helper function to make HTTP requests
-function apiRequest(endpoint, options = {}) {
-    return new Promise((resolve, reject) => {
-        const url = `http://localhost:5000${endpoint}`;
-        const reqOptions = {
-            hostname: 'localhost',
-            port: 5000,
-            path: endpoint,
-            method: options.method || 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-                ...(options.headers || {})
-            }
-        };
-
-        const req = http.request(reqOptions, (res) => {
-            let data = '';
-            
-            res.on('data', (chunk) => {
-                data += chunk;
-            });
-            
-            res.on('end', () => {
-                try {
-                    resolve(JSON.parse(data));
-                } catch (e) {
-                    resolve(data);
-                }
-            });
-        });
-
-        req.on('error', (e) => {
-            reject(e);
-        });
-
-        if (options.body) {
-            req.write(JSON.stringify(options.body));
+async function waitForBackend(timeoutMs = 15000) {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+        try {
+            const res = await fetch(`${BACKEND_URL}/api/v1/health`);
+            if (res.ok) return true;
+        } catch (e) {
+            // Not listening yet
         }
-
-        req.end();
-    });
+        await new Promise(resolve => setTimeout(resolve, 300));
+    }
+    return false;
 }
 
-function createWindow() {
-    mainWindow = new BrowserWindow({
+async function postApi(endpoint, body) {
+    const response = await fetch(`${BACKEND_URL}${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    });
+    if (!response.ok) {
+        throw new Error(`Backend returned ${response.status} for ${endpoint}`);
+    }
+    return response.json();
+}
+
+function startScan() {
+    return postApi('/api/v1/scan/start', { drive: 'C:' });
+}
+
+function runCleanup(type = 'smart') {
+    return postApi('/api/v1/cleanup/run', { type });
+}
+
+function logActionFailure(error) {
+    console.error('EatUp action failed:', error);
+}
+
+async function createWindow() {
+    const mainWindow = new BrowserWindow({
         width: 1200,
         height: 800,
-        minWidth: 800,
-        minHeight: 600,
         webPreferences: {
+            // The UI loads third-party CDN scripts, so it must not get Node access
             nodeIntegration: false,
-            contextIsolation: true,
-            preload: path.join(__dirname, 'preload.js')
+            contextIsolation: true
         },
-        title: 'EatUp Pro - Disk Cleanup Tool',
+        icon: path.join(__dirname, 'assets', 'icon.png'),
         show: false,
-        backgroundColor: '#fbfbfd',
-        icon: path.join(__dirname, 'assets', 'icon.png')
+        backgroundColor: '#fbfbfd'
     });
 
-    // Load the web app
-    mainWindow.loadFile('../app.html');
+    // Serve the UI from the backend so its relative /api/v1 calls resolve
+    if (await waitForBackend()) {
+        mainWindow.loadURL(`${BACKEND_URL}/app.html`);
+    } else {
+        mainWindow.loadFile(path.join(PROJECT_ROOT, 'app.html'));  // Demo mode
+    }
 
     // Show when ready
     mainWindow.once('ready-to-show', () => {
@@ -105,211 +92,94 @@ function createWindow() {
 
     // System tray integration
     setupTray(mainWindow);
-}
 
-function createSystemIcon() {
-    // Create a simple blue square icon using nativeImage
-    const canvas = require('canvas');
-    const img = canvas.createCanvas(64, 64);
-    const ctx = img.getContext('2d');
-    
-    // Draw background
-    ctx.fillStyle = '#3b82f6';
-    ctx.fillRect(0, 0, 64, 64);
-    
-    // Draw disk symbol
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(32, 32, 20, 0, Math.PI * 2);
-    ctx.stroke();
-    
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(28, 40, 8, 6);
-    
-    return nativeImage.createFromDataURL(img.toDataURL());
+    // Create menu
+    const template = [
+        {
+            label: 'App',
+            submenu: [
+                { role: 'quit' }
+            ]
+        },
+        { role: 'editMenu' },
+        {
+            label: 'View',
+            submenu: [
+                { role: 'reload' },
+                { role: 'toggleDevTools' },
+                { type: 'separator' },
+                { role: 'zoomIn' },
+                { role: 'zoomOut' },
+                { role: 'resetZoom' }
+            ]
+        },
+        {
+            label: 'Features',
+            submenu: [
+                {
+                    label: 'Scan Drive',
+                    accelerator: 'CmdOrCtrl+S',
+                    click: () => startScan().catch(logActionFailure)
+                },
+                {
+                    label: 'Smart Cleanup',
+                    click: () => runCleanup('smart').catch(logActionFailure)
+                }
+            ]
+        }
+    ];
+
+    const menu = Menu.buildFromTemplate(template);
+    Menu.setApplicationMenu(menu);
 }
 
 function setupTray(parentWindow) {
-    let trayIcon;
-    try {
-        const iconPath = path.join(__dirname, 'assets', 'icon.ico');
-        if (require('fs').existsSync(iconPath)) {
-            trayIcon = new Tray(iconPath);
-        }
-    } catch (e) {
-        console.log('Using default system tray');
-        trayIcon = new Tray(nativeImage.createEmpty());
-    }
-    
-    if (!trayIcon) return;
-    
-    trayIcon.setToolTip('EatUp Pro - Disk Cleanup Tool');
+    const { Tray } = require('electron');
+    const iconPath = path.join(__dirname, 'assets', 'icon.ico');
+    if (!fs.existsSync(iconPath)) return;
+
+    tray = new Tray(iconPath);  // Module-level so it isn't garbage collected
+
+    tray.setToolTip('EatUp Pro - Disk Cleanup Tool');
 
     const contextMenu = Menu.buildFromTemplate([
         {
             label: 'Quick Scan',
-            icon: nativeImage.createFromPath(path.join(__dirname, 'assets', 'scan.png')),
-            click: () => parentWindow.webContents.send('quick-action', { action: 'scan' })
+            click: () => startScan().catch(logActionFailure)
         },
         {
             label: 'Smart Cleanup',
-            icon: nativeImage.createFromPath(path.join(__dirname, 'assets', 'cleanup.png')),
-            click: () => parentWindow.webContents.send('quick-action', { action: 'cleanup', type: 'smart' })
+            click: () => runCleanup('smart').catch(logActionFailure)
         },
         { type: 'separator' },
         {
-            label: 'View Storage Overview',
+            label: 'Open App',
             click: () => parentWindow.show()
         },
-        { type: 'separator' },
-        {
-            label: 'Analytics Dashboard',
-            click: () => {
-                const dashboardWindow = new BrowserWindow({
-                    width: 1000,
-                    height: 700,
-                    parent: parentWindow,
-                    webPreferences: {
-                        nodeIntegration: false,
-                        contextIsolation: true
-                    }
-                });
-                dashboardWindow.loadFile('../analytics_dashboard.html');
-            }
-        },
-        { type: 'separator' },
         {
             label: 'Quit',
             click: () => app.quit()
         }
     ]);
 
-    trayIcon.setContextMenu(contextMenu);
-    
-    // Double-click to show main window
-    trayIcon.on('double-click', () => {
-        parentWindow.show();
-    });
-}
-
-// Setup IPC handlers for renderer process
-function setupIPCHandlers() {
-    ipcMain.handle('api-request', async (event, endpoint, options = {}) => {
-        try {
-            const result = await apiRequest(endpoint, options);
-            return { success: true, data: result };
-        } catch (error) {
-            return { success: false, error: error.message };
-        }
-    });
-
-    ipcMain.handle('start-scan', async (event, drive = 'C:') => {
-        try {
-            const result = await apiRequest('/api/v1/scan/start', {
-                method: 'POST',
-                body: { drive }
-            });
-            return { success: true, data: result };
-        } catch (error) {
-            return { success: false, error: error.message };
-        }
-    });
-
-    ipcMain.handle('run-cleanup', async (event, { type }) => {
-        try {
-            const result = await apiRequest('/api/v1/cleanup/run', {
-                method: 'POST',
-                body: { type }
-            });
-            return { success: true, data: result };
-        } catch (error) {
-            return { success: false, error: error.message };
-        }
-    });
-
-    ipcMain.handle('get-usage-stats', async () => {
-        try {
-            const result = await apiRequest('/api/v1/usage/stats');
-            return { success: true, data: result };
-        } catch (error) {
-            return { success: false, error: error.message };
-        }
-    });
-
-    ipcMain.handle('health-check', async () => {
-        try {
-            const result = await apiRequest('/api/v1/health');
-            return { success: true, data: result };
-        } catch (error) {
-            return { success: false, error: error.message };
-        }
-    });
-
-    ipcMain.handle('get-recent-scans', async (event, limit = 10) => {
-        try {
-            const result = await apiRequest(`/api/v1/analytics/scans?limit=${limit}`);
-            return { success: true, data: result };
-        } catch (error) {
-            return { success: false, error: error.message };
-        }
-    });
-
-    ipcMain.handle('get-cleanup-history', async (event, limit = 20) => {
-        try {
-            const result = await apiRequest(`/api/v1/analytics/cleanup-history?limit=${limit}`);
-            return { success: true, data: result };
-        } catch (error) {
-            return { success: false, error: error.message };
-        }
-    });
-
-    ipcMain.handle('get-trends', async (event, days = 90) => {
-        try {
-            const result = await apiRequest(`/api/v1/analytics/trends?days=${days}`);
-            return { success: true, data: result };
-        } catch (error) {
-            return { success: false, error: error.message };
-        }
-    });
-
-    ipcMain.handle('get-statistics', async () => {
-        try {
-            const result = await apiRequest('/api/v1/analytics/statistics');
-            return { success: true, data: result };
-        } catch (error) {
-            return { success: false, error: error.message };
-        }
-    });
+    tray.setContextMenu(contextMenu);
 }
 
 app.whenReady().then(() => {
     startPythonBackend();
 
     // Expose Python API to JavaScript
-    ipcMain.handle('start-scan', async () => {
-        return fetch('http://localhost:5000/api/v1/scan/start', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ drive: 'C:' })
-        }).then(res => res.json());
-    });
+    ipcMain.handle('start-scan', () => startScan());
 
-    ipcMain.handle('run-cleanup', async (event, { type }) => {
-        return fetch('http://localhost:5000/api/v1/cleanup/run', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type })
-        }).then(res => res.json());
-    });
+    ipcMain.handle('run-cleanup', (event, { type }) => runCleanup(type));
 
     ipcMain.handle('get-usage-stats', async () => {
-        return fetch('http://localhost:5000/api/v1/usage/stats')
+        return fetch(`${BACKEND_URL}/api/v1/usage/stats`)
             .then(res => res.json());
     });
 
     ipcMain.handle('health-check', async () => {
-        return fetch('http://localhost:5000/api/v1/health')
+        return fetch(`${BACKEND_URL}/api/v1/health`)
             .then(res => res.json());
     });
 

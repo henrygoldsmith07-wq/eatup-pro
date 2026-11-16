@@ -117,7 +117,7 @@ JavaScript/UI:  13%  (800 / 6,200 lines)
 | Category | Features Implemented | Percentage |
 |----------|---------------------|------------|
 | Core Cleaning | 7/7 | 100% |
-| Cloud Integration | 5/5 | 100% |
+| Cloud Integration | 0/5 shipped (CLI demo only) | 0% |
 | Scheduling | 6/6 | 100% |
 | API Endpoints | 12/15 | 80% |
 | Documentation | 7/7 | 100% |
@@ -476,9 +476,9 @@ You now have everything you need:
 
 ---
 
-*Project Status*: ✅ **Production Ready**  
-*Version*: 1.0.0  
-*Last Updated*: October 2026  
-*Next Release*: v1.1.0 (Desktop app + enhanced analytics)
+*Project Status*: ✅ **Local tool ready; cloud features not shipped**  
+*Version*: 1.2.0  
+*Last Updated*: November 2026  
+*Next Release*: no date set (see README → Current Limitations)
 
 **Thank you for exploring EatUp Pro!** 🙏

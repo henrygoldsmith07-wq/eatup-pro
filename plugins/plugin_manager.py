@@ -9,7 +9,7 @@ import sys
 import importlib.util
 from pathlib import Path
 from typing import List, Dict, Any
-from base_plugin import BasePlugin, PluginRegistry
+from .base_plugin import BasePlugin, PluginRegistry
 
 
 class PluginManager:
@@ -135,9 +135,9 @@ class PluginManager:
         return recommendations[:10]  # Top 10 recommendations
     
     def install_plugin_from_url(self, url: str) -> bool:
-        """Install plugin from URL (placeholder)"""
-        print(f"Would download plugin from: {url}")
-        return True
+        """Downloading plugins is not implemented; never claim a successful install."""
+        print(f"Plugin installation from {url!r} is not implemented; nothing was installed.")
+        return False
     
     def uninstall_plugin(self, plugin_id: str) -> bool:
         """Uninstall a plugin"""

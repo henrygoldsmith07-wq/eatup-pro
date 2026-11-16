@@ -9,6 +9,10 @@
     <style>
         .reveal { opacity: 0; transform: translateY(30px); transition: all 0.8s ease; }
         .reveal.active { opacity: 1; transform: translateY(0); }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+            .reveal { opacity: 1; transform: none; }
+        }
         .glass-nav { background-color: rgba(255,255,255,0.9); backdrop-filter: blur(24px); }
         .dark .glass-nav { background-color: rgba(7,9,14,0.9); }
         @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
@@ -41,7 +45,7 @@
                 <a href="#storage-map" class="text-neutral-600 dark:text-neutral-400 hover:text-brand-500">Storage Map</a>
                 <a href="#file-discovery" class="text-neutral-600 dark:text-neutral-400 hover:text-brand-500">File Discovery</a>
                 <a href="#cleanup" class="text-neutral-600 dark:text-neutral-400 hover:text-brand-500">Cleanup</a>
-                <button id="themeToggle" class="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800">
+                <button id="themeToggle" aria-label="Toggle dark mode" class="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800">
                     <svg class="w-5 h-5 dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
                     <svg class="w-5 h-5 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
                 </button>
@@ -50,6 +54,7 @@
     </nav>
 
     <!-- Section: Storage Map -->
+    <main>
     <section id="storage-map" class="pt-32 pb-20 px-6 min-h-screen flex items-center">
         <div class="max-w-7xl mx-auto w-full reveal active">
             <h1 class="text-4xl md:text-5xl font-bold mb-6">Interactive Storage Map</h1>
@@ -99,7 +104,7 @@
                     <div class="w-14 h-14 bg-brand-500/10 rounded-xl flex items-center justify-center mb-4">
                         <span class="text-3xl">💾</span>
                     </div>
-                    <h3 class="text-xl font-bold mb-3">Large Files</h3>
+                    <h2 class="text-xl font-bold mb-3">Large Files</h2>
                     <ul class="space-y-2 text-neutral-600 dark:text-neutral-400">
                         <li>• ISO images (>5GB)</li>
                         <li>• Video files (.mkv, .mp4)</li>
@@ -111,7 +116,7 @@
                     <div class="w-14 h-14 bg-green-500/10 rounded-xl flex items-center justify-center mb-4">
                         <span class="text-3xl">🔄</span>
                     </div>
-                    <h3 class="text-xl font-bold mb-3">Duplicates</h3>
+                    <h2 class="text-xl font-bold mb-3">Duplicates</h2>
                     <ul class="space-y-2 text-neutral-600 dark:text-neutral-400">
                         <li>• Same file content</li>
                         <li>• Different names</li>
@@ -123,7 +128,7 @@
                     <div class="w-14 h-14 bg-purple-500/10 rounded-xl flex items-center justify-center mb-4">
                         <span class="text-3xl">🗑️</span>
                     </div>
-                    <h3 class="text-xl font-bold mb-3">Temporary Files</h3>
+                    <h2 class="text-xl font-bold mb-3">Temporary Files</h2>
                     <ul class="space-y-2 text-neutral-600 dark:text-neutral-400">
                         <li>• System temp files</li>
                         <li>• Browser caches</li>
@@ -149,7 +154,7 @@
                         </div>
                     </div>
                     <div>
-                        <h3 class="text-2xl font-bold mb-4">Safety First</h3>
+                        <h2 class="text-2xl font-bold mb-4">Safety First</h2>
                         <p class="mb-4">Every file you delete goes to the Recycle Bin first - nothing is permanently removed until you choose to empty it.</p>
                         <ul class="space-y-2 mb-6">
                             <li class="flex items-start gap-2">
@@ -171,6 +176,8 @@
             </div>
         </div>
     </section>
+
+    </main>
 
     <!-- Footer -->
     <footer class="py-12 px-6 bg-neutral-100 dark:bg-neutral-950">

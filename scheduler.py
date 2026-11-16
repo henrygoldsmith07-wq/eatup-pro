@@ -5,7 +5,10 @@ Supports Windows Task Scheduler integration and Python-based scheduling
 """
 
 import os
+import sys
 import json
+import argparse
+import uuid
 import subprocess
 import platform
 from datetime import datetime, timedelta
@@ -21,6 +24,11 @@ try:
 except ImportError:
     SCHEDULE_AVAILABLE = False
     print("Warning: schedule package not installed. Install with: pip install schedule")
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+FREQUENCIES = {'daily', 'weekly', 'monthly'}
+ACTIONS = {'scan', 'find_duplicates', 'cleanup_temp', 'cleanup_duplicates', 'smart_cleanup'}
+WEEKDAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
 
 
 @dataclass
@@ -46,42 +54,36 @@ class ScanSchedule:
         if self.created_at is None:
             self.created_at = datetime.now()
     
-    def get_next_run(self) -> Optional[datetime]:
-        """Calculate next scheduled run time"""
+    def get_next_run(self, after: Optional[datetime] = None) -> Optional[datetime]:
+        """Calculate the first scheduled run strictly after `after` (default: now)"""
         if not self.enabled:
             return None
         
-        now = datetime.now()
+        now = after or datetime.now()
+        hour, minute = (int(x) for x in self.time.split(':'))
+        candidate = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
         
         if self.frequency == 'daily':
-            return now.replace(hour=int(self.time.split(':')[0]), 
-                             minute=int(self.time.split(':')[1]),
-                             second=0) + timedelta(days=1)
+            if candidate <= now:
+                candidate += timedelta(days=1)
+            return candidate
         
-        elif self.frequency == 'weekly' and self.day_of_week:
-            days_ahead = self._days_until_day(self.day_of_week)
-            return now.replace(hour=int(self.time.split(':')[0]),
-                             minute=int(self.time.split(':')[1]),
-                             second=0) + timedelta(days=days_ahead or 7)
+        if self.frequency == 'weekly':
+            target = WEEKDAYS.index((self.day_of_week or WEEKDAYS[self.created_at.weekday()]).lower())
+            candidate += timedelta(days=(target - now.weekday()) % 7)
+            if candidate <= now:
+                candidate += timedelta(days=7)
+            return candidate
         
-        elif self.frequency == 'monthly' and self.day_of_month:
-            # Calculate next occurrence in month
-            next_day = min(now.day + 1, 28)  # Safety limit
-            return now.replace(day=self.day_of_month,
-                             hour=int(self.time.split(':')[0]),
-                             minute=int(self.time.split(':')[1]),
-                             second=0)
+        if self.frequency == 'monthly':
+            day = min(self.day_of_month or 1, 28)  # Every month has a 28th
+            candidate = candidate.replace(day=day)
+            if candidate <= now:
+                year, month = (now.year + 1, 1) if now.month == 12 else (now.year, now.month + 1)
+                candidate = candidate.replace(year=year, month=month)
+            return candidate
         
         return None
-    
-    def _days_until_day(self, target_day: str) -> int:
-        """Calculate days until target day of week"""
-        days = {'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3,
-                'friday': 4, 'saturday': 5, 'sunday': 6}
-        today = datetime.now().weekday()
-        target = days.get(target_day.lower(), 0)
-        days_until = (target - today) % 7
-        return days_until if days_until > 0 else 7
 
 
 @dataclass
@@ -100,7 +102,7 @@ class ScheduledTaskLog:
 class SchedulerManager:
     """Manages scheduled scans and automated cleanup tasks"""
     
-    def __init__(self, config_file: str = "scheduled_tasks.json"):
+    def __init__(self, config_file: str = os.path.join(BASE_DIR, "scheduled_tasks.json")):
         self.config_file = config_file
         self.tasks: Dict[str, ScanSchedule] = {}
         self.logs: List[ScheduledTaskLog] = []
@@ -109,6 +111,7 @@ class SchedulerManager:
         
         # Load existing tasks
         self.load_tasks()
+        self._load_logs()
     
     def load_tasks(self) -> bool:
         """Load tasks from configuration file"""
@@ -125,7 +128,11 @@ class SchedulerManager:
                     if 'last_run' in task_data and task_data['last_run']:
                         task_data['last_run'] = datetime.fromisoformat(task_data['last_run'])
                     
-                    self.tasks[task_id] = ScanSchedule(**task_data)
+                    task = ScanSchedule(**task_data)
+                    # Recompute rather than trust a stored time: a stale next_run
+                    # would fire a missed cleanup the moment the scheduler starts
+                    task.next_run = task.get_next_run()
+                    self.tasks[task_id] = task
                 
                 print(f"Loaded {len(self.tasks)} scheduled tasks")
                 return True
@@ -160,7 +167,17 @@ class SchedulerManager:
     def add_task(self, name: str, drive: str = "C:", frequency: str = "daily",
                  time: str = "02:00", actions: List[str] = None, enabled: bool = True) -> str:
         """Add a new scheduled task"""
-        task_id = f"task_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        if frequency not in FREQUENCIES:
+            raise ValueError(f"frequency must be one of {sorted(FREQUENCIES)}")
+        try:
+            datetime.strptime(time, '%H:%M')
+        except ValueError:
+            raise ValueError("time must be HH:MM")
+        unknown = set(actions or []) - ACTIONS
+        if unknown:
+            raise ValueError(f"Unknown actions: {sorted(unknown)}")
+        
+        task_id = f"task_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
         
         task = ScanSchedule(
             id=task_id,
@@ -171,6 +188,7 @@ class SchedulerManager:
             actions=actions or ['scan'],
             enabled=enabled
         )
+        task.next_run = task.get_next_run()
         
         self.tasks[task_id] = task
         self.save_tasks()
@@ -190,7 +208,9 @@ class SchedulerManager:
     def toggle_task(self, task_id: str) -> bool:
         """Enable/disable a task"""
         if task_id in self.tasks:
-            self.tasks[task_id].enabled = not self.tasks[task_id].enabled
+            task = self.tasks[task_id]
+            task.enabled = not task.enabled
+            task.next_run = task.get_next_run()
             self.save_tasks()
             status = "enabled" if self.tasks[task_id].enabled else "disabled"
             print(f"✓ Task {task_id} {status}")
@@ -222,8 +242,7 @@ class SchedulerManager:
             files_processed = 0
             space_freed = 0.0
             
-            # Import EatUp cleaner (relative import)
-            sys.path.append(os.path.dirname(__file__))
+            sys.path.append(BASE_DIR)
             from cleaner import EatUpCleaner
             
             cleaner = EatUpCleaner()
@@ -238,22 +257,26 @@ class SchedulerManager:
                     files_processed += len(result.temp_files) + len(result.large_files)
                     print(f"   Found {files_processed} candidate files")
                 
+                elif action == 'find_duplicates':
+                    print("   Finding duplicates...")
+                    cleaner.find_duplicates()
+                
                 elif action == 'cleanup_temp':
                     print("   Cleaning temporary files...")
                     cleaned = cleaner.cleanup_temp_files(dry_run=False)
-                    space_freed += cleaned / (1024 * 1024)
+                    space_freed += cleaned.freed_bytes / (1024 * 1024)
                     print(f"   Freed {space_freed:.2f} MB")
                 
                 elif action == 'cleanup_duplicates':
                     print("   Removing duplicates...")
                     cleaned = cleaner.cleanup_duplicates(dry_run=False)
-                    space_freed += cleaned / (1024 * 1024)
+                    space_freed += cleaned.freed_bytes / (1024 * 1024)
                     print(f"   Freed {space_freed:.2f} MB")
                 
                 elif action == 'smart_cleanup':
                     print("   Running smart cleanup...")
                     cleaned = cleaner.smart_cleanup(dry_run=False)
-                    space_freed += cleaned / (1024 * 1024)
+                    space_freed += cleaned.freed_bytes / (1024 * 1024)
                     print(f"   Freed {space_freed:.2f} MB")
                 
                 time.sleep(1)  # Small delay between actions
@@ -270,14 +293,14 @@ class SchedulerManager:
             print(f"Duration: {(log.completed_at - log.started_at).total_seconds():.1f}s")
             print(f"{'='*60}\n")
             
-            # Update task metadata
-            task.last_run = datetime.now()
-            task.next_run = task.get_next_run()
-            
         except Exception as e:
             log.status = "failed"
             log.error_message = str(e)
             print(f"✗ Task failed: {e}")
+        
+        # Advance the schedule even on failure, or the loop retries every minute
+        task.last_run = datetime.now()
+        task.next_run = task.get_next_run()
         
         # Save log
         self.logs.append(log)
@@ -303,7 +326,7 @@ class SchedulerManager:
             try:
                 now = datetime.now()
                 
-                for task_id, task in self.tasks.items():
+                for task_id, task in list(self.tasks.items()):
                     if task.enabled and task.next_run:
                         if now >= task.next_run:
                             print(f"\n⏰ Running scheduled task: {task.name}")
@@ -348,12 +371,28 @@ class SchedulerManager:
         """Get recent task execution logs"""
         return [asdict(log) for log in self.logs[-limit:][::-1]]  # Most recent first
     
+    @property
+    def _log_file(self) -> str:
+        return self.config_file.replace('.json', '_logs.json')
+    
+    def _load_logs(self):
+        """Load previous logs so saving doesn't overwrite history"""
+        try:
+            if os.path.exists(self._log_file):
+                with open(self._log_file, 'r') as f:
+                    for entry in json.load(f):
+                        for key in ('started_at', 'completed_at'):
+                            if entry.get(key):
+                                entry[key] = datetime.fromisoformat(entry[key])
+                        self.logs.append(ScheduledTaskLog(**entry))
+        except Exception as e:
+            print(f"Error loading logs: {e}")
+    
     def _save_logs(self):
         """Save logs to file"""
         try:
-            log_file = self.config_file.replace('.json', '_logs.json')
-            with open(log_file, 'w') as f:
-                json.dump([asdict(log) for log in self.logs], f, indent=2)
+            with open(self._log_file, 'w') as f:
+                json.dump([asdict(log) for log in self.logs[-500:]], f, indent=2, default=str)
         except Exception as e:
             print(f"Error saving logs: {e}")
     
@@ -362,12 +401,19 @@ class SchedulerManager:
         """Create Windows Task Scheduler entry for auto-start on boot"""
         script_path = os.path.abspath(__file__)
         
-        task_xml = f"""
-<?xml version="1.0" encoding="UTF-16"?>
-<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/xml/task">
+        safe_task_name = (task_name.replace('&', '&amp;').replace('<', '&lt;')
+                         .replace('>', '&gt;').replace('"', '&quot;'))
+        safe_script_path = (script_path.replace('&', '&amp;').replace('<', '&lt;')
+                           .replace('>', '&gt;').replace('"', '&quot;'))
+        # Use the exact interpreter running the app: a bare python.exe on PATH
+        # may resolve to the Windows Store stub and fail silently in the task.
+        safe_python = (sys.executable.replace('&', '&amp;').replace('<', '&lt;')
+                       .replace('>', '&gt;').replace('"', '&quot;'))
+        task_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <RegistrationInfo>
-    <Description>EatUp Pro Scheduled Scanner - {task_name}</Description>
-    <URI>\\{task_name}</URI>
+    <Description>EatUp Pro Scheduled Scanner - {safe_task_name}</Description>
+    <URI>\\{safe_task_name}</URI>
   </RegistrationInfo>
   <Settings>
     <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
@@ -400,25 +446,40 @@ class SchedulerManager:
   </Triggers>
   <Actions>
     <Exec>
-      <Command>python.exe</Command>
-      <Arguments>"{script_path}" --auto-run "{task_id}"</Arguments>
+      <Command>{safe_python}</Command>
+      <Arguments>"{safe_script_path}" --auto-run "{task_id}"</Arguments>
     </Exec>
   </Actions>
 </Task>
 """
         # Save XML file for manual task creation
         task_xml_file = f"eatup_task_{task_id}.xml"
-        with open(task_xml_file, 'w') as f:
+        with open(task_xml_file, 'w', encoding='utf-8') as f:
             f.write(task_xml)
         
         print(f"Created Task Scheduler XML: {task_xml_file}")
-        print("Import this into Task Scheduler or use: schtasks /create /tn \"EatUp {task_name}\" /xml \"{task_xml_file}\"")
+        print(f'Import this into Task Scheduler or use: schtasks /create /tn "EatUp {safe_task_name}" /xml "{task_xml_file}"')
 
 
-def main():
+def main(argv=None):
     """CLI interface for scheduled tasks"""
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, 'reconfigure'):
+            stream.reconfigure(encoding='utf-8', errors='replace')
+
+    parser = argparse.ArgumentParser(description='EatUp Pro scheduled tasks')
+    parser.add_argument('--auto-run', metavar='TASK_ID',
+                        help='run one task non-interactively (used by Task Scheduler)')
+    args = parser.parse_args(argv)
+
     manager = SchedulerManager()
-    
+    if args.auto_run:
+        if args.auto_run not in manager.tasks:
+            print(f"Unknown task id: {args.auto_run}")
+            return 1
+        log = manager.run_task(args.auto_run)
+        return 0 if log.status == 'completed' else 1
+
     print("=" * 60)
     print("EATUP PRO - Scheduled Scanning Management")
     print("=" * 60)
@@ -462,7 +523,7 @@ def main():
             if logs:
                 print("\nRecent Task Execution:")
                 for log in logs:
-                    print(f"{log['task_name']}: {log['status']} @ {log['started_at'][:16]}")
+                    print(f"{log['task_name']}: {log['status']} @ {str(log['started_at'])[:16]}")
                     if log['status'] == 'completed':
                         print(f"  Processed: {log['files_processed']} files, Freed: {log['space_freed_mb']:.1f} MB")
             else:
@@ -492,10 +553,11 @@ def main():
         elif choice == '9':
             print("Goodbye!")
             break
-        
+
         else:
             print("Invalid choice")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

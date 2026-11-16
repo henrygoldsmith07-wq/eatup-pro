@@ -3,17 +3,32 @@ EatUp Pro - SQLite Analytics Database
 Handles persistent storage of scan history, cleanup operations, and AI recommendations
 """
 
+import json
 import sqlite3
+import threading
 from datetime import datetime
+from functools import wraps
 from typing import List, Dict, Any, Optional
 from pathlib import Path
+
+DEFAULT_DB_PATH = Path(__file__).resolve().parent / "analytics.db"
+
+
+def _locked(method):
+    """Serialize access: the API server shares one connection across threads"""
+    @wraps(method)
+    def wrapper(self, *args, **kwargs):
+        with self._lock:
+            return method(self, *args, **kwargs)
+    return wrapper
 
 
 class AnalyticsDatabase:
     """SQLite database for storing analytics and historical data"""
     
-    def __init__(self, db_path: str = "data/analytics.db"):
+    def __init__(self, db_path: str = DEFAULT_DB_PATH):
         self.db_path = Path(db_path)
+        self._lock = threading.RLock()
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.conn = None
         self._connect()
@@ -21,7 +36,7 @@ class AnalyticsDatabase:
     
     def _connect(self):
         """Connect to SQLite database"""
-        self.conn = sqlite3.connect(str(self.db_path))
+        self.conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
     
     def _create_tables(self):
@@ -111,6 +126,7 @@ class AnalyticsDatabase:
     
     # ==================== SCAN MANAGEMENT ====================
     
+    @_locked
     def save_scan(self, scan_data: Dict[str, Any], duration: float = None):
         """Save a scan result to the database"""
         cursor = self.conn.cursor()
@@ -139,6 +155,7 @@ class AnalyticsDatabase:
         self.conn.commit()
         return scan_data.get('scan_id')
     
+    @_locked
     def get_recent_scans(self, limit: int = 10) -> List[Dict]:
         """Get recent scan history"""
         cursor = self.conn.cursor()
@@ -148,6 +165,7 @@ class AnalyticsDatabase:
         
         return [dict(row) for row in cursor.fetchall()]
     
+    @_locked
     def get_scan_by_id(self, scan_id: str) -> Optional[Dict]:
         """Get a specific scan by ID"""
         cursor = self.conn.cursor()
@@ -157,6 +175,7 @@ class AnalyticsDatabase:
     
     # ==================== CLEANUP HISTORY ====================
     
+    @_locked
     def record_cleanup(self, cleanup_data: Dict[str, Any]) -> str:
         """Record a cleanup operation"""
         cursor = self.conn.cursor()
@@ -179,6 +198,7 @@ class AnalyticsDatabase:
         self.conn.commit()
         return cleanup_data.get('cleanup_id')
     
+    @_locked
     def get_cleanup_history(self, limit: int = 20) -> List[Dict]:
         """Get recent cleanup operations"""
         cursor = self.conn.cursor()
@@ -192,6 +212,7 @@ class AnalyticsDatabase:
         
         return [dict(row) for row in cursor.fetchall()]
     
+    @_locked
     def get_total_space_saved(self, days: int = 30) -> int:
         """Calculate total space saved over last N days"""
         cursor = self.conn.cursor()
@@ -208,6 +229,7 @@ class AnalyticsDatabase:
     
     # ==================== RECOMMENDATIONS ====================
     
+    @_locked
     def save_recommendation(self, rec_data: Dict[str, Any]) -> str:
         """Save an AI recommendation"""
         cursor = self.conn.cursor()
@@ -234,6 +256,7 @@ class AnalyticsDatabase:
         self.conn.commit()
         return rec_data.get('recommendation_id')
     
+    @_locked
     def update_user_decision(self, recommendation_id: str, decision: str):
         """Record user's decision on a recommendation"""
         cursor = self.conn.cursor()
@@ -243,6 +266,7 @@ class AnalyticsDatabase:
         ''', (decision, datetime.now().isoformat(), recommendation_id))
         self.conn.commit()
     
+    @_locked
     def get_recommendations_for_scan(self, scan_id: str) -> List[Dict]:
         """Get all recommendations for a specific scan"""
         cursor = self.conn.cursor()
@@ -254,6 +278,7 @@ class AnalyticsDatabase:
     
     # ==================== USER PREFERENCES ====================
     
+    @_locked
     def save_preference(self, key: str, value: Any):
         """Save user preference"""
         cursor = self.conn.cursor()
@@ -263,6 +288,7 @@ class AnalyticsDatabase:
         ''', (key, json.dumps(value) if not isinstance(value, str) else value, datetime.now().isoformat()))
         self.conn.commit()
     
+    @_locked
     def get_preference(self, key: str, default: Any = None) -> Any:
         """Get user preference"""
         cursor = self.conn.cursor()
@@ -278,6 +304,7 @@ class AnalyticsDatabase:
     
     # ==================== TREND ANALYSIS ====================
     
+    @_locked
     def calculate_trends(self, days: int = 90) -> Dict[str, Any]:
         """Calculate storage usage trends"""
         cursor = self.conn.cursor()
@@ -291,7 +318,8 @@ class AnalyticsDatabase:
             ORDER BY timestamp ASC
         ''', (cutoff_date,))
         
-        scans = [dict(row) for row in cursor.fetchall()]
+        scans = [dict(row) for row in cursor.fetchall()
+                 if row['utilization_percent'] is not None]
         
         if len(scans) < 2:
             return {
@@ -300,7 +328,7 @@ class AnalyticsDatabase:
                 'monthly_growth_mb': 0,
                 'trend_direction': 'stable',
                 'average_utilization': 0,
-                'data_points': 0
+                'data_points': len(scans)
             }
         
         # Calculate growth rates
@@ -346,6 +374,7 @@ class AnalyticsDatabase:
             'data_points': len(scans)
         }
     
+    @_locked
     def cache_trends(self, trends: Dict[str, Any]):
         """Cache computed trends for fast dashboard loading"""
         cursor = self.conn.cursor()
@@ -365,6 +394,7 @@ class AnalyticsDatabase:
         
         self.conn.commit()
     
+    @_locked
     def get_cached_trends(self, max_age_hours: int = 24) -> Optional[Dict]:
         """Get cached trends if still fresh"""
         cursor = self.conn.cursor()
@@ -382,6 +412,7 @@ class AnalyticsDatabase:
     
     # ==================== STATISTICS ====================
     
+    @_locked
     def get_statistics(self) -> Dict[str, Any]:
         """Get overall statistics about app usage"""
         cursor = self.conn.cursor()
@@ -398,7 +429,7 @@ class AnalyticsDatabase:
         
         # Total space freed
         cursor.execute('SELECT SUM(space_freed_bytes) as total FROM cleanup_history')
-        stats['total_space_freed_mb'] = cursor.fetchone()['total'] / (1024 ** 2)
+        stats['total_space_freed_mb'] = (cursor.fetchone()['total'] or 0) / (1024 ** 2)
         
         # Total recommendations generated
         cursor.execute('SELECT COUNT(*) as count FROM recommendations')
@@ -424,10 +455,6 @@ class AnalyticsDatabase:
         """Close database connection"""
         if self.conn:
             self.conn.close()
-
-
-# Import at module level
-import json
 
 
 if __name__ == "__main__":

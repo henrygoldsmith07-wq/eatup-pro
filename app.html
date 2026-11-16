@@ -4,6 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EatUp Pro - Disk Cleanup Tool</title>
+    <meta name="description" content="Analyse disk usage, find duplicate files and safely reclaim storage on your Windows PC.">
+    <link rel="icon" href="/favicon.ico" sizes="any">
+    <style>
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+        }
+    </style>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
@@ -38,7 +45,8 @@
 <body class="bg-[#fbfbfd] dark:bg-[#07090e] transition-colors duration-300 min-h-screen">
 
     <!-- Navigation -->
-    <nav class="glass-nav fixed w-full z-50 border-b border-neutral-200/20 dark:border-neutral-800/20">
+    <a href="#storage-section" class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[60] focus:bg-white focus:px-4 focus:py-2 focus:rounded">Skip to main content</a>
+    <nav aria-label="Primary" class="glass-nav fixed w-full z-50 border-b border-neutral-200/20 dark:border-neutral-800/20">
         <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
             <a href="#" class="flex items-center gap-2">
                 <svg class="w-8 h-8 text-brand-500" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5zm0 9l2-1-2-1-2 1 2 1zm0-3.5L12 3l2 0.5-2 1.5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
@@ -48,7 +56,7 @@
                 <button onclick="scanDrive()" class="text-neutral-600 dark:text-neutral-400 hover:text-brand-500 font-medium">Scan Drive</button>
                 <button onclick="showSection('storage')" class="text-neutral-600 dark:text-neutral-400 hover:text-brand-500 font-medium">Storage</button>
                 <button onclick="showSection('cleanup')" class="text-neutral-600 dark:text-neutral-400 hover:text-brand-500 font-medium">Cleanup</button>
-                <button id="themeToggle" class="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800">
+                <button id="themeToggle" aria-label="Toggle dark mode" class="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800">
                     <svg class="w-5 h-5 dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
                     <svg class="w-5 h-5 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
                 </button>
@@ -91,22 +99,22 @@
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
                 <button onclick="quickClean('temp')" class="bg-white dark:bg-neutral-800 p-6 rounded-xl border border-neutral-200 dark:border-neutral-700 hover:border-brand-500 transition-all">
                     <div class="text-3xl mb-2">🗑️</div>
-                    <h3 class="font-bold">Clear Temp Files</h3>
+                    <h2 class="font-bold">Clear Temp Files</h2>
                     <p class="text-sm text-neutral-500">Remove temporary files</p>
                 </button>
                 <button onclick="quickClean('duplicates')" class="bg-white dark:bg-neutral-800 p-6 rounded-xl border border-neutral-200 dark:border-neutral-700 hover:border-brand-500 transition-all">
                     <div class="text-3xl mb-2">🔄</div>
-                    <h3 class="font-bold">Find Duplicates</h3>
+                    <h2 class="font-bold">Find Duplicates</h2>
                     <p class="text-sm text-neutral-500">Identify duplicate files</p>
                 </button>
                 <button onclick="quickClean('large')" class="bg-white dark:bg-neutral-800 p-6 rounded-xl border border-neutral-200 dark:border-neutral-700 hover:border-brand-500 transition-all">
                     <div class="text-3xl mb-2">💾</div>
-                    <h3 class="font-bold">Large Files</h3>
+                    <h2 class="font-bold">Large Files</h2>
                     <p class="text-sm text-neutral-500">Find files >1GB</p>
                 </button>
                 <button onclick="quickClean('all')" class="bg-gradient-to-br from-brand-500 to-brand-700 text-white p-6 rounded-xl hover:shadow-lg transition-all">
                     <div class="text-3xl mb-2">⚡</div>
-                    <h3 class="font-bold">Smart Cleanup</h3>
+                    <h2 class="font-bold">Smart Cleanup</h2>
                     <p class="text-sm opacity-90">Auto-cleanup recommended</p>
                 </button>
             </div>
@@ -152,7 +160,7 @@
             </div>
 
             <!-- Scan Progress Modal -->
-            <div id="scanModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+            <div id="scanModal" role="dialog" aria-modal="true" aria-labelledby="scanTitle" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-6">
                 <div class="bg-white dark:bg-neutral-800 rounded-2xl p-8 max-w-md w-full shadow-2xl">
                     <div class="flex items-center gap-4 mb-6">
                         <div class="w-12 h-12 bg-brand-500/20 rounded-full flex items-center justify-center">
@@ -161,9 +169,9 @@
                         <h3 class="font-bold text-lg" id="scanTitle">Scanning...</h3>
                     </div>
                     <div class="w-full bg-neutral-200 dark:bg-neutral-700 rounded-full h-3 overflow-hidden">
-                        <div id="scanProgress" class="bg-brand-500 h-full rounded-full progress-bar" style="width: 0%"></div>
+                        <div id="scanProgress" role="progressbar" aria-label="Scan progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" class="bg-brand-500 h-full rounded-full progress-bar" style="width: 0%"></div>
                     </div>
-                    <p id="scanStatus" class="mt-4 text-sm text-neutral-600 dark:text-neutral-400">Starting scan...</p>
+                    <p id="scanStatus" role="status" aria-live="polite" class="mt-4 text-sm text-neutral-600 dark:text-neutral-400">Starting scan...</p>
                 </div>
             </div>
 
@@ -238,12 +246,21 @@
         
         // Display actual scan results from API
         async function displayScanResults(results, scanId) {
+            lastScanResults = results;
             const map = document.getElementById('storageMap');
             const categories = ['Applications', 'Videos', 'Documents', 'Images', 'Music', 'Downloads', 'System', 'Other'];
             const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500', 'bg-red-500', 'bg-teal-500', 'bg-indigo-500', 'bg-pink-500'];
             
             // Update storage totals
             document.getElementById('totalUsed').textContent = `${results.total_used_gb ? results.total_used_gb.toFixed(1) : '--'} GB used`;
+            const ofTotal = document.querySelector('#storageResults .glass-nav p.text-sm');
+            if (ofTotal && results.total_space_gb) {
+                ofTotal.textContent = `of ${results.total_space_gb.toFixed(1)} GB total`;
+            }
+            const freeUp = document.querySelector('#storageResults .bg-gradient-to-br p strong');
+            if (freeUp) {
+                freeUp.textContent = formatSize(results.cleanable_gb);
+            }
             
             // Clear and rebuild storage map with real data
             map.innerHTML = '';
@@ -261,13 +278,13 @@
                     div.className = `${colors[i % colors.length]} rounded-lg treemap-item relative group cursor-pointer hover:opacity-90 transition-opacity`;
                     div.style.gridColumn = `span ${colSpan}`;
                     div.style.gridRow = `span ${rowSpan}`;
-                    div.title = `${cat}: ${size.toFixed(1)} GB`;
+                    div.title = `${cat}: ${formatSize(size)}`;
                     div.innerHTML = `
                         <div class="absolute inset-0 flex items-center justify-center text-white font-bold text-sm opacity-0 group-hover:opacity-100 transition-opacity">
                             ${categories[i] || cat}
                         </div>
                         <div class="absolute bottom-2 left-2 right-2 text-xs opacity-90 truncate">
-                            ${(size * 1024).toFixed(0)} MB
+                            ${formatSize(size)}
                         </div>
                     `;
                     
@@ -312,7 +329,7 @@
                             <span class="text-lg">${icon}</span>
                             <span class="font-semibold text-neutral-700 dark:text-neutral-300">${name}</span>
                         </div>
-                        <span class="text-sm text-neutral-500">${percentage}% (${size.toFixed(1)} GB)</span>
+                        <span class="text-sm text-neutral-500">${percentage}% (${formatSize(size)})</span>
                     </div>
                     <div class="w-full bg-neutral-200 dark:bg-neutral-700 rounded-full h-3 overflow-hidden">
                         <div class="bg-brand-500 h-full rounded-full progress-bar" style="width: ${percentage}%"></div>
@@ -324,24 +341,27 @@
         
         // Show category details tooltip
         function showCategoryDetails(category, size) {
-            alert(`${category} files:\nSize: ${size.toFixed(1)} GB\nThis category could be cleaned up.`);
+            alert(`${category} files:\nSize: ${formatSize(size)}\nThis category could be cleaned up.`);
         }
         
         // Prepare cleanup categories based on scan results
         function prepareCleanupCategories() {
-            // This will populate the cleanup categories section
-            // In the full implementation, this would fetch file lists from the API
             const cleanupSection = document.getElementById('cleanup-section');
             cleanupSection.classList.remove('hidden');
-            
+
+            const results = lastScanResults || {};
+            const gb = value => formatSize(value);
             const categories = [
-                { id: 'temp', name: 'Temporary Files', icon: '🗑️', count: 'Scanning...', size: 'Calculating...' },
-                { id: 'duplicates', name: 'Duplicate Files', icon: '🔄', count: 'Scanning...', size: 'Calculating...' },
-                { id: 'large', name: 'Large Files (>1GB)', icon: '💾', count: 'Scanning...', size: 'Calculating...' },
-                { id: 'downloads', name: 'Old Downloads', icon: '📥', count: 'Pending', size: '-' },
-                { id: 'cache', name: 'System Cache', icon: '💰', count: 'Pending', size: '-' }
+                { id: 'temp', name: 'Temporary Files', icon: '🗑️',
+                  count: `${results.temp_files_count ?? 0} files`, size: gb(results.temp_gb) },
+                { id: 'duplicates', name: 'Duplicate Files', icon: '🔄',
+                  count: `${results.duplicate_groups ?? 0} groups`, size: gb(results.duplicate_gb) },
+                { id: 'large', name: 'Large Files (>1GB)', icon: '💾',
+                  count: `${results.large_files_count ?? 0} files`, size: 'See results' },
+                { id: 'downloads', name: 'Old Downloads', icon: '📥', count: 'Not scanned', size: '-' },
+                { id: 'cache', name: 'System Cache', icon: '💰', count: 'Not scanned', size: '-' }
             ];
-            
+
             renderCleanupCategoriesWithRealData(categories);
         }
         
@@ -351,24 +371,29 @@
             container.innerHTML = '';
             
             categories.forEach(cat => {
+                const available = !String(cat.count).includes('Not scanned');
                 const card = document.createElement('div');
-                card.className = 'bg-white dark:bg-neutral-800 rounded-xl p-6 file-card cursor-pointer border-2 border-transparent hover:border-brand-500';
+                card.className = 'bg-white dark:bg-neutral-800 rounded-xl p-6 file-card border-2 border-transparent hover:border-brand-500';
                 card.id = cat.id + '-card';
                 card.innerHTML = `
                     <div class="flex items-start gap-4">
-                        <input type="checkbox" class="mt-1 w-5 h-5 rounded border-gray-300 text-brand-500 focus:ring-brand-500" disabled>
+                        <input type="checkbox" aria-label="Select ${cat.name} for cleanup"
+                               onclick="event.stopPropagation()"
+                               class="mt-1 w-5 h-5 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
+                               ${available ? `onchange="updateSelection('${cat.id}')"` : 'disabled'}>
                         <div class="flex-1">
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center gap-3">
-                                    <span class="text-2xl">${cat.icon}</span>
+                                    <span class="text-2xl" aria-hidden="true">${cat.icon}</span>
                                     <h3 class="font-bold text-lg">${cat.name}</h3>
                                 </div>
-                                <span class="text-sm text-neutral-500">${cat.count} files • ${cat.size}</span>
+                                <span class="text-sm text-neutral-500">${cat.count} • ${cat.size}</span>
                             </div>
-                            <p class="text-sm text-neutral-600 dark:text-neutral-400 mt-1">Loading data from scan...</p>
+                            <p class="text-sm text-neutral-600 dark:text-neutral-400 mt-1">${available ? 'Moved to Recycle Bin after confirmation' : 'Not included in the current scan'}</p>
                         </div>
                     </div>
                 `;
+                if (available) card.onclick = () => toggleSelection(cat.id);
                 container.appendChild(card);
             });
         }
@@ -396,16 +421,75 @@
             }
         }
 
-        // API Configuration
+        // API Configuration. Sample data is only acceptable when the page is
+        // opened directly from disk, and must be labelled as such.
         const API_BASE_URL = '/api/v1';
+        const DEMO_MODE = location.protocol === 'file:';
+        let lastScanResults = null;
+
+        function setProgress(value) {
+            const bar = document.getElementById('scanProgress');
+            bar.style.width = value;
+            const numeric = parseInt(String(value), 10);
+            if (Number.isFinite(numeric)) bar.setAttribute('aria-valuenow', String(numeric));
+        }
+
+        function formatSize(gb) {
+            const bytes = (gb || 0) * 1024 ** 3;
+            if (bytes === 0) return '0 B';
+            if (bytes < 1024) return `${bytes.toFixed(0)} B`;
+            if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(0)} KB`;
+            if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+            return `${gb.toFixed(2)} GB`;
+        }
+
+        function escapeHtml(value) {
+            return String(value).replace(/[&<>"']/g, ch => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            })[ch]);
+        }
         
+        function apiUnavailable(message) {
+            const dialog = document.createElement('div');
+            dialog.className = 'fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-6';
+            dialog.setAttribute('role', 'alertdialog');
+            dialog.setAttribute('aria-modal', 'true');
+            dialog.innerHTML = `
+                <div class="bg-white dark:bg-neutral-800 rounded-2xl p-8 max-w-md w-full shadow-2xl">
+                    <h3 class="font-bold text-lg mb-2">Unable to reach the API</h3>
+                    <p class="text-neutral-600 dark:text-neutral-400 mb-4">${escapeHtml(message)}</p>
+                    <p class="text-sm text-neutral-500 mb-4">Run <code>python api_server.py</code> and reload this page. No files were changed.</p>
+                    <button type="button" onclick="this.closest('.fixed').remove()" class="px-6 py-3 bg-brand-500 text-white rounded-lg font-semibold hover:bg-brand-600">Dismiss</button>
+                </div>
+            `;
+            document.body.appendChild(dialog);
+            dialog.querySelector('button').focus();
+        }
+
+        function showDemoBanner() {
+            if (document.getElementById('demoBanner')) return;
+            const banner = document.createElement('div');
+            banner.id = 'demoBanner';
+            banner.className = 'bg-amber-100 text-amber-900 px-6 py-3 text-center font-semibold';
+            banner.textContent = 'Sample data only — no disk was scanned and no files were changed.';
+            document.querySelector('main').prepend(banner);
+        }
+
+        function showApiError(message) {
+            if (DEMO_MODE) {
+                alert('Demo mode: ' + message);
+            } else {
+                apiUnavailable(message);
+            }
+        }
+
         async function scanDrive(drive = 'C:') {
             const modal = document.getElementById('scanModal');
             const progressBar = document.getElementById('scanProgress');
             const statusText = document.getElementById('scanStatus');
             
             modal.classList.remove('hidden');
-            progressBar.style.width = '5%';
+            setProgress('5%');
             statusText.textContent = 'Initializing scan...';
             
             try {
@@ -424,11 +508,11 @@
                 const scanId = data.scan_id;
                 
                 statusText.textContent = `Scan started (${drive}). Waiting for results...`;
-                progressBar.style.width = '20%';
+                setProgress('20%');
                 
                 // Poll for scan completion
                 let attempts = 0;
-                const maxAttempts = 180; // 3 minutes total
+                const maxAttempts = 600; // 10 minutes: duplicate detection hashes file contents
                 
                 while (attempts < maxAttempts) {
                     await sleep(1000); // Wait 1 second between polls
@@ -437,21 +521,21 @@
                     const statusResponse = await fetch(`${API_BASE_URL}/scan/status/${scanId}`);
                     const statusData = await statusResponse.json();
                     
+                    if (statusData.status === 'failed') {
+                        throw new Error(statusData.message);
+                    }
+                    
                     if (statusData.status === 'complete') {
-                        progressBar.style.width = '100%';
+                        setProgress('100%');
                         statusText.textContent = 'Scan complete! Loading results...';
                         
                         // Get detailed results
                         const resultsResponse = await fetch(`${API_BASE_URL}/scan/results/${scanId}`);
-                        if (resultsResponse.ok) {
-                            const results = await resultsResponse.json();
-                            displayScanResults(results, scanId);
-                        } else {
-                            // Fallback: use static results if endpoint unavailable
-                            populateStorageData();
-                            renderCleanupCategories();
+                        if (!resultsResponse.ok) {
+                            throw new Error('Scan finished but its results are no longer available. Run a new scan.');
                         }
-                        
+                        displayScanResults(await resultsResponse.json(), scanId);
+
                         setTimeout(() => {
                             modal.classList.add('hidden');
                         }, 500);
@@ -459,7 +543,7 @@
                     } else if (statusData.status === 'running') {
                         // Update progress based on scan phase
                         const progress = statusData.progress || Math.min(80, (attempts / maxAttempts) * 80);
-                        progressBar.style.width = `${progress}%`;
+                        setProgress(`${progress}%`);
                         
                         // Dynamic status messages based on progress
                         if (attempts < 30) {
@@ -475,55 +559,14 @@
                 if (attempts >= maxAttempts) {
                     throw new Error('Scan timed out');
                 }
-                
+
             } catch (error) {
                 console.error('Scan error:', error);
                 modal.classList.add('hidden');
-                
-                // Show user-friendly error message
-                const errorMsg = document.createElement('div');
-                errorMsg.className = 'fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-6';
-                errorMsg.innerHTML = `
-                    <div class="bg-white dark:bg-neutral-800 rounded-2xl p-8 max-w-md w-full shadow-2xl">
-                        <div class="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center mb-4">
-                            <svg class="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                            </svg>
-                        </div>
-                        <h3 class="font-bold text-lg mb-2">Scan Failed</h3>
-                        <p class="text-neutral-600 dark:text-neutral-400 mb-4">${error.message}</p>
-                        <p class="text-sm text-neutral-500 mb-4">Make sure the EatUp Pro API server is running on port 5000.</p>
-                        <button onclick="this.closest('.fixed').classList.add('hidden')" class="px-6 py-3 bg-brand-500 text-white rounded-lg font-semibold hover:bg-brand-600">Dismiss</button>
-                    </div>
-                `;
-                document.body.appendChild(errorMsg);
-                
-                // Fall back to demo mode for local testing
-                statusText.textContent = 'Running in demo mode (server not available)...';
-                progressBar.style.width = '0%';
-                
-                const demoSteps = [
-                    { msg: 'Analyzing file system...', delay: 500 },
-                    { msg: 'Scanning large files...', delay: 800 },
-                    { msg: 'Checking for duplicates...', delay: 600 },
-                    { msg: 'Identifying temporary files...', delay: 400 },
-                    { msg: 'Calculating statistics...', delay: 300 }
-                ];
-                
-                let currentStep = 0;
-                const interval = setInterval(() => {
-                    if (currentStep < demoSteps.length) {
-                        progressBar.style.width = ((currentStep + 1) / demoSteps.length * 100) + '%';
-                        statusText.textContent = demoSteps[currentStep].msg;
-                        currentStep++;
-                    } else {
-                        clearInterval(interval);
-                        modal.classList.add('hidden');
-                        document.getElementById('storageResults').classList.remove('hidden');
-                        populateStorageData(); // Still show demo data
-                        renderCleanupCategories();
-                    }
-                }, demoSteps[currentStep]?.delay || 100);
+                showApiError(error.message || 'The scan could not be completed.');
+                // Never present sample numbers as a real scan result. Only the
+                // file:// demo is allowed to show sample data, clearly labelled.
+                if (DEMO_MODE) showDemoBanner();
             }
         }
 
@@ -594,52 +637,59 @@
         }
 
         // Update Selection
-        function updateSelection(id) {
-            const checkbox = document.querySelector(`#${id}-card input`);
-            const wasSelected = !checkbox.checked;
-            checkbox.checked = !wasSelected;
-            
-            if (!wasSelected) {
-                document.getElementById('cleanupPreview').classList.remove('hidden');
-                renderFilesList();
+        function updateSelection() {
+            const selected = [...document.querySelectorAll('#cleanup-categories input:checked')];
+            const preview = document.getElementById('cleanupPreview');
+            if (selected.length) {
+                preview.classList.remove('hidden');
+                renderFilesList(selected);
+            } else {
+                preview.classList.add('hidden');
             }
         }
 
         // Toggle Selection
         function toggleSelection(id) {
             const checkbox = document.querySelector(`#${id}-card input`);
-            checkbox.checked = !checkbox.checked;
-            updateSelection(id);
+            if (checkbox && !checkbox.disabled) {
+                checkbox.checked = !checkbox.checked;
+                updateSelection();
+            }
         }
 
         // Render Files List
-        function renderFilesList() {
+        function renderFilesList(selected = []) {
             const list = document.getElementById('filesList');
-            const files = [
-                { name: 'install_vista.exe', size: '2.1 GB', category: 'Downloads' },
-                { name: 'backup_2023.zip', size: '1.8 GB', category: 'Large Files' },
-                { name: 'temp_file_001.tmp', size: '150 MB', category: 'Temporary' },
-                { name: 'duplicate_photo.jpg', size: '4.2 MB', category: 'Duplicates' }
-            ];
-            
             list.innerHTML = '';
-            files.forEach(file => {
-                const item = document.createElement('div');
-                item.className = 'flex justify-between items-center p-4 bg-neutral-50 dark:bg-neutral-900 rounded-lg';
-                item.innerHTML = `
-                    <div class="flex items-center gap-3">
-                        <svg class="w-8 h-8 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
-                        <div>
-                            <p class="font-semibold">${file.name}</p>
-                            <p class="text-sm text-neutral-500">${file.category}</p>
+
+            const large = (lastScanResults && lastScanResults.large_files) || [];
+            if (!large.length) {
+                const empty = document.createElement('p');
+                empty.className = 'text-sm text-neutral-500';
+                empty.textContent = 'File-level details are not included in the scan API response. Export a report from the CLI for the full list.';
+                list.appendChild(empty);
+            } else {
+                large.forEach(file => {
+                    const item = document.createElement('div');
+                    item.className = 'flex justify-between items-center gap-3 p-4 bg-neutral-50 dark:bg-neutral-900 rounded-lg';
+                    item.innerHTML = `
+                        <div class="min-w-0">
+                            <p class="font-semibold truncate" title="${file.path}">${file.path.split(/[\\/]/).pop()}</p>
+                            <p class="text-sm text-neutral-500 truncate">${file.path}</p>
                         </div>
-                    </div>
-                    <p class="font-bold text-brand-500">${file.size}</p>
-                `;
-                list.appendChild(item);
-            });
-            
-            document.getElementById('totalSpace').textContent = '19.1 GB';
+                        <p class="font-bold text-brand-500 whitespace-nowrap">${(file.size_gb || 0).toFixed(2)} GB</p>
+                    `;
+                    list.appendChild(item);
+                });
+            }
+
+            const cleanable = selected.reduce((sum, checkbox) => {
+                const id = checkbox.closest('[id]')?.id || '';
+                if (id.startsWith('temp')) return sum + (lastScanResults?.temp_gb || 0);
+                if (id.startsWith('duplicates')) return sum + (lastScanResults?.duplicate_gb || 0);
+                return sum;
+            }, 0);
+            document.getElementById('totalSpace').textContent = `${formatSize(cleanable)} estimated`;
         }
 
         // Execute Cleanup via API
@@ -649,7 +699,7 @@
             const statusText = document.getElementById('scanStatus');
             
             modal.classList.remove('hidden');
-            progressBar.style.width = '5%';
+            setProgress('5%');
             statusText.textContent = `Starting ${cleanupType} cleanup...`;
             
             try {
@@ -666,7 +716,7 @@
                 const data = await response.json();
                 
                 // Update progress
-                progressBar.style.width = '40%';
+                setProgress('40%');
                 statusText.textContent = 'Processing files...';
                 
                 // Wait a moment then show results
@@ -680,9 +730,7 @@
             } catch (error) {
                 console.error('Cleanup error:', error);
                 modal.classList.add('hidden');
-                
-                // Show error in demo mode
-                alert(`Demo Mode: Cleanup would free up space.\n\nNote: The backend server is not running.\nRun python api_server.py to enable full functionality.`);
+                showApiError(error.message || 'Cleanup could not be completed. No files were changed.');
             }
         }
         
@@ -702,8 +750,14 @@
         
         // Quick Clean Functions - Updated to use API
         async function quickClean(type) {
+            if (!lastScanResults) {
+                showSection('storage');
+                showApiError('Run a scan first so cleanup knows what is safe to remove. No files were changed.');
+                return;
+            }
             showSection('cleanup');
-            await performCleanup(type);
+            // The API calls the combined operation 'smart'; the quick action says 'all'.
+            await performCleanup(type === 'all' ? 'smart' : type);
         }
         
         // Cleanup operations
@@ -744,13 +798,8 @@
                 mobileMenuBtn.addEventListener('click', toggleMobileMenu);
             }
             
-            // Bind quick action buttons to performCleanup
-            document.querySelectorAll('[onclick^="quickClean"]').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    const type = this.getAttribute('onclick').match(/quickClean\('(.*?)'\)/)[1];
-                    performCleanup(type);
-                });
-            });
+            // Dynamic category cards are also keyboard and screen-reader accessible
+            document.getElementById('cleanupPreview').setAttribute('aria-live', 'polite');
         });
     </script>
 </body>

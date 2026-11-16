@@ -1,17 +1,17 @@
 # EatUp Pro - Advanced Features Implementation Plan
 
-This document outlines all advanced features being implemented to transform EatUp from a simple disk cleaner into a comprehensive cloud-connected storage management platform.
+This document is an implementation plan, not a statement of shipped behavior. Items marked ⚠️ Demo only or ⏳ Planned are not available in the REST API.
 
 ## 🎯 Feature Status Overview
 
 | Feature | Status | File | Description |
 |---------|--------|------|-------------|
-| Cloud Storage Integration | ✅ Implemented | `cloud_storage.py` | Google Drive & Dropbox scanning |
+| Cloud Storage Integration | ⚠️ Demo only | `cloud_storage.py` | CLI demo; REST connect returns 501 |
 | Scheduled Scans | ✅ Implemented | `scheduler.py` | Automated monthly/weekly cleanup |
 | Desktop App (Electron) | ⏳ Planned | `electron/` | Native desktop experience |
 | Mobile Companion | ⏳ Planned | `mobile/` | iOS/Android dashboard |
-| Analytics Dashboard | ⏳ Planned | `analytics.py` | Historical usage trends |
-| AI Suggestions | ⏳ Planned | `ai_suggestions.py` | Smart cleanup recommendations |
+| Analytics Dashboard | ✅ Implemented | `analytics_dashboard.html` | Historical usage trends |
+| AI Suggestions | ✅ Implemented | `ai_suggestions.py` | Heuristic recommendations via REST |
 | Multi-language Support | ⏳ Planned | `i18n/` | Internationalization framework |
 | Plugin System | ⏳ Planned | `plugins/` | Custom file type filters |
 | Team Deployment | ⏳ Planned | `team/` | Network-wide management |
