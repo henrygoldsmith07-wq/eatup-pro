@@ -160,7 +160,7 @@
             </div>
 
             <!-- Scan Progress Modal -->
-            <div id="scanModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+            <div id="scanModal" role="dialog" aria-modal="true" aria-labelledby="scanTitle" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-6">
                 <div class="bg-white dark:bg-neutral-800 rounded-2xl p-8 max-w-md w-full shadow-2xl">
                     <div class="flex items-center gap-4 mb-6">
                         <div class="w-12 h-12 bg-brand-500/20 rounded-full flex items-center justify-center">
@@ -169,9 +169,9 @@
                         <h3 class="font-bold text-lg" id="scanTitle">Scanning...</h3>
                     </div>
                     <div class="w-full bg-neutral-200 dark:bg-neutral-700 rounded-full h-3 overflow-hidden">
-                        <div id="scanProgress" class="bg-brand-500 h-full rounded-full progress-bar" style="width: 0%"></div>
+                        <div id="scanProgress" role="progressbar" aria-label="Scan progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" class="bg-brand-500 h-full rounded-full progress-bar" style="width: 0%"></div>
                     </div>
-                    <p id="scanStatus" class="mt-4 text-sm text-neutral-600 dark:text-neutral-400">Starting scan...</p>
+                    <p id="scanStatus" role="status" aria-live="polite" class="mt-4 text-sm text-neutral-600 dark:text-neutral-400">Starting scan...</p>
                 </div>
             </div>
 
@@ -427,6 +427,13 @@
         const DEMO_MODE = location.protocol === 'file:';
         let lastScanResults = null;
 
+        function setProgress(value) {
+            const bar = document.getElementById('scanProgress');
+            bar.style.width = value;
+            const numeric = parseInt(String(value), 10);
+            if (Number.isFinite(numeric)) bar.setAttribute('aria-valuenow', String(numeric));
+        }
+
         function formatSize(gb) {
             const bytes = (gb || 0) * 1024 ** 3;
             if (bytes === 0) return '0 B';
@@ -482,7 +489,7 @@
             const statusText = document.getElementById('scanStatus');
             
             modal.classList.remove('hidden');
-            progressBar.style.width = '5%';
+            setProgress('5%');
             statusText.textContent = 'Initializing scan...';
             
             try {
@@ -501,7 +508,7 @@
                 const scanId = data.scan_id;
                 
                 statusText.textContent = `Scan started (${drive}). Waiting for results...`;
-                progressBar.style.width = '20%';
+                setProgress('20%');
                 
                 // Poll for scan completion
                 let attempts = 0;
@@ -519,7 +526,7 @@
                     }
                     
                     if (statusData.status === 'complete') {
-                        progressBar.style.width = '100%';
+                        setProgress('100%');
                         statusText.textContent = 'Scan complete! Loading results...';
                         
                         // Get detailed results
@@ -536,7 +543,7 @@
                     } else if (statusData.status === 'running') {
                         // Update progress based on scan phase
                         const progress = statusData.progress || Math.min(80, (attempts / maxAttempts) * 80);
-                        progressBar.style.width = `${progress}%`;
+                        setProgress(`${progress}%`);
                         
                         // Dynamic status messages based on progress
                         if (attempts < 30) {
@@ -692,7 +699,7 @@
             const statusText = document.getElementById('scanStatus');
             
             modal.classList.remove('hidden');
-            progressBar.style.width = '5%';
+            setProgress('5%');
             statusText.textContent = `Starting ${cleanupType} cleanup...`;
             
             try {
@@ -709,7 +716,7 @@
                 const data = await response.json();
                 
                 // Update progress
-                progressBar.style.width = '40%';
+                setProgress('40%');
                 statusText.textContent = 'Processing files...';
                 
                 // Wait a moment then show results
