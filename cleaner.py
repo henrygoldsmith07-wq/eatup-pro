@@ -5,6 +5,7 @@ A modern, safe disk space analyzer and cleaner for Windows
 """
 
 import os
+import sys
 import json
 import shutil
 import hashlib
@@ -462,6 +463,10 @@ def _confirm_cleanup(preview: CleanupResult, files: List[FileInfo] = ()) -> bool
 
 def main():
     """Main CLI interface"""
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, 'reconfigure'):
+            stream.reconfigure(encoding='utf-8', errors='replace')
+
     print("=" * 60)
     print("   EATUP PRO - Disk Cleanup Tool")
     print("=" * 60)

@@ -679,6 +679,12 @@ def internal_error(error):
 
 def main():
     """Start the API server"""
+    # Windows consoles default to cp1252; the engine logs emoji, which would
+    # otherwise raise UnicodeEncodeError inside a background scan thread.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, 'reconfigure'):
+            stream.reconfigure(encoding='utf-8', errors='replace')
+
     port = int(os.getenv('PORT', 5000))
     debug = os.getenv('DEBUG', 'false').lower() == 'true'
     

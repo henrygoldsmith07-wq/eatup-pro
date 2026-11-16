@@ -459,6 +459,10 @@ class SchedulerManager:
 
 def main(argv=None):
     """CLI interface for scheduled tasks"""
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, 'reconfigure'):
+            stream.reconfigure(encoding='utf-8', errors='replace')
+
     parser = argparse.ArgumentParser(description='EatUp Pro scheduled tasks')
     parser.add_argument('--auto-run', metavar='TASK_ID',
                         help='run one task non-interactively (used by Task Scheduler)')
