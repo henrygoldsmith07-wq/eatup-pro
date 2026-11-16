@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EatUp Pro - Analytics Dashboard</title>
+    <meta name="description" content="Review recorded disk scans, cleanup history and storage trends for EatUp Pro.">
+    <link rel="icon" href="/favicon.ico" sizes="any">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -20,9 +22,9 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
                 <div class="flex items-center">
-                    <h1 class="text-xl font-bold text-brand-600">EatUp Pro Analytics</h1>
+                    <h1 class="text-xl font-bold text-blue-600 dark:text-blue-300">EatUp Pro Analytics</h1>
                 </div>
-                <button onclick="refreshData()" class="inline-flex items-center px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700">
+                <button onclick="refreshData()" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                     Refresh Data
                 </button>
@@ -32,6 +34,7 @@
 
     <!-- Main Content -->
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <p id="dataError" role="alert" class="hidden mb-6 rounded-lg bg-red-100 px-4 py-3 text-sm text-red-800"></p>
         
         <!-- Key Metrics Cards -->
         <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8 fade-in">
@@ -88,29 +91,29 @@
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
             <!-- Usage Trend Chart -->
             <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm">
-                <h3 class="text-lg font-semibold mb-4">Storage Usage Trend (90 Days)</h3>
+                <h2 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Storage Usage Trend (90 Days)</h2>
                 <canvas id="usageTrendChart"></canvas>
             </div>
             
             <!-- Category Distribution Pie -->
             <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm">
-                <h3 class="text-lg font-semibold mb-4">Category Distribution</h3>
+                <h2 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Category Distribution</h2>
                 <canvas id="categoryPieChart"></canvas>
             </div>
         </div>
 
         <!-- Cleanup History -->
         <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm">
-            <h3 class="text-lg font-semibold mb-4">Recent Cleanup Activities</h3>
+            <h2 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Recent Cleanup Activities</h2>
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                     <thead class="bg-gray-50 dark:bg-gray-700">
                         <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date/Time</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Files Cleaned</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Space Freed</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Date/Time</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Type</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Files Cleaned</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Space Freed</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
                         </tr>
                     </thead>
                     <tbody id="cleanupTableBody" class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -124,7 +127,7 @@
         <div class="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
             <!-- Drive Full Prediction -->
             <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm">
-                <h3 class="text-lg font-semibold mb-4">Drive Full Prediction</h3>
+                <h2 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Drive Full Prediction</h2>
                 <div id="predictionCard">
                     <div class="text-center py-8">
                         <svg class="w-16 h-16 mx-auto text-yellow-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -137,7 +140,7 @@
             
             <!-- Smart Recommendations -->
             <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm">
-                <h3 class="text-lg font-semibold mb-4">AI Recommendations</h3>
+                <h2 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">AI Recommendations</h2>
                 <ul id="recommendationsList" class="space-y-3">
                     <!-- Populated by JavaScript -->
                 </ul>
@@ -149,152 +152,198 @@
     <script>
         // API Configuration
         const API_BASE = '/api/v1';
-        
+
         let usageChart, pieChart;
+        let hasScan = false;
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, ch => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            })[ch]);
+        }
+
+        function fmtMb(mb) {
+            const value = Number(mb) || 0;
+            return value >= 1024 ? `${(value / 1024).toFixed(2)} GB` : `${value.toFixed(1)} MB`;
+        }
+
+        async function getJson(path, options) {
+            const response = await fetch(`${API_BASE}${path}`, options);
+            if (!response.ok) throw new Error(`${response.status} from ${path}`);
+            return response.json();
+        }
+
+        function showDataError(message) {
+            const banner = document.getElementById('dataError');
+            if (!banner) return;
+            banner.textContent = `Some analytics could not be loaded: ${message}. Existing values were left unchanged.`;
+            banner.classList.remove('hidden');
+        }
 
         async function fetchData() {
             try {
-                // Get usage stats
-                const statsResponse = await fetch(`${API_BASE}/usage/stats`);
-                const stats = await statsResponse.json();
-                
-                // Update metrics
-                document.getElementById('totalUsed').textContent = (stats.used_gb || 0).toFixed(1) + ' GB';
-                document.getElementById('growthRate').textContent = '10.5 MB/day'; // Placeholder
-                
-                // Generate mock data for charts
-                generateMockChartData();
-                
+                const [stats, appStats, trends, scans, history, prediction, latest] = await Promise.all([
+                    getJson('/usage/stats'),
+                    getJson('/analytics/statistics'),
+                    getJson('/analytics/trends?days=90'),
+                    getJson('/analytics/scans?limit=30'),
+                    getJson('/analytics/cleanup-history?limit=20'),
+                    getJson('/ai/prediction'),
+                    getJson('/scan/latest').catch(() => null)
+                ]);
+
+                document.getElementById('totalUsed').textContent = `${(stats.used_gb || 0).toFixed(1)} GB`;
+                document.getElementById('spaceFreed').textContent = fmtMb(appStats.total_space_saved_last_30_days_mb || appStats.total_space_freed_mb || 0);
+                document.getElementById('filesAnalyzed').textContent = latest ? (latest.files_scanned ?? 0).toLocaleString() : (appStats.total_scans || 0);
+                const growth = trends.data_points >= 2 ? trends.daily_growth_mb : null;
+                document.getElementById('growthRate').textContent = growth === null
+                    ? 'Not enough data'
+                    : `${Number(growth).toFixed(1)} MB/day`;
+
+                hasScan = Boolean(latest);
+                updateCharts(scans.scans || [], latest);
+                updateCleanupTable(history.cleanups || []);
+                updatePrediction(prediction);
+                updateRecommendations(latest, prediction, trends);
+                document.getElementById('dataError').classList.add('hidden');
             } catch (error) {
-                console.error('Error fetching data:', error);
+                console.error('Error fetching analytics:', error);
+                showDataError(error.message);
             }
         }
 
-        function generateMockChartData() {
-            // Usage trend chart
-            const ctxUsage = document.getElementById('usageTrendChart').getContext('2d');
-            const days = Array.from({length: 30}, (_, i) => i + 1);
-            const usedValues = Array.from({length: 30}, () => Math.floor(Math.random() * 50) + 150);
-            
-            if (usageChart) usageChart.destroy();
-            
-            usageChart = new Chart(ctxUsage, {
-                type: 'line',
-                data: {
-                    labels: days.map(d => `Day ${d}`),
-                    datasets: [{
-                        label: 'Used Space (GB)',
-                        data: usedValues,
-                        borderColor: '#3b82f6',
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        tension: 0.4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    plugins: { legend: { display: false } }
-                }
-            });
-            
-            // Category pie chart
-            const ctxPie = document.getElementById('categoryPieChart').getContext('2d');
-            const categories = ['Apps', 'Videos', 'Docs', 'Images', 'Music', 'Other'];
-            const values = [45, 24, 18, 8, 3, 2];
-            
-            if (pieChart) pieChart.destroy();
-            
-            pieChart = new Chart(ctxPie, {
-                type: 'doughnut',
-                data: {
-                    labels: categories,
-                    datasets: [{
-                        data: values,
-                        backgroundColor: ['#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ef4444', '#6b7280']
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    plugins: { 
-                        legend: { position: 'bottom' },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    return context.label + ': ' + context.raw + '%';
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-            
-            // Update cleanup table
-            updateCleanupTable();
-            
-            // Generate recommendations
-            generateRecommendations();
+        function ensureCanvas(id) {
+            const existing = document.getElementById(id);
+            if (existing && existing.tagName === 'CANVAS') return existing;
+            const canvas = document.createElement('canvas');
+            canvas.id = id;
+            if (existing) existing.parentNode.replaceChild(canvas, existing);
+            return canvas;
         }
 
-        function updateCleanupTable() {
-            const tbody = document.getElementById('cleanupTableBody');
-            const recentCleans = [];
-            
-            // Mock data
-            for (let i = 0; i < 5; i++) {
-                const date = new Date();
-                date.setDate(date.getDate() - i);
-                
-                recentCleans.push({
-                    date: date.toLocaleString(),
-                    type: ['Smart', 'Temp Files', 'Duplicates'][Math.floor(Math.random() * 3)],
-                    files: Math.floor(Math.random() * 200) + 10,
-                    freed: (Math.random() * 500).toFixed(1),
-                    status: 'completed'
+        function updateCharts(scans, latest) {
+            const usageCanvas = ensureCanvas('usageTrendChart');
+            const pieCanvas = ensureCanvas('categoryPieChart');
+
+            if (usageChart) { usageChart.destroy(); usageChart = null; }
+            if (pieChart) { pieChart.destroy(); pieChart = null; }
+
+            if (scans.length >= 2) {
+                usageChart = new Chart(usageCanvas.getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: scans.map(s => new Date(s.timestamp).toLocaleDateString()),
+                        datasets: [{
+                            label: 'Used Space (GB)',
+                            data: scans.map(s => Number(s.total_used_gb) || 0),
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            tension: 0.4
+                        }]
+                    },
+                    options: { responsive: true, plugins: { legend: { display: false } } }
                 });
+            } else {
+                usageCanvas.replaceWith(emptyCanvasNote(usageCanvas, 'At least two scans are needed to draw a trend.'));
             }
-            
-            tbody.innerHTML = recentCleans.map(clean => `
+
+            const categories = latest && latest.categories
+                ? Object.entries(latest.categories).filter(([, size]) => size > 0)
+                : [];
+            if (categories.length) {
+                pieChart = new Chart(pieCanvas.getContext('2d'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: categories.map(([name]) => name),
+                        datasets: [{
+                            data: categories.map(([, size]) => Number(size) || 0),
+                            backgroundColor: ['#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ef4444', '#6b7280', '#0ea5e9', '#ec4899']
+                        }]
+                    },
+                    options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+                });
+            } else {
+                pieCanvas.replaceWith(emptyCanvasNote(pieCanvas, 'Run a scan to see the category breakdown.'));
+            }
+        }
+
+        function emptyCanvasNote(canvas, message) {
+            const note = document.createElement('p');
+            note.className = 'text-sm text-gray-500 dark:text-gray-400 text-center py-10';
+            note.textContent = message;
+            note.id = canvas.id;
+            canvas.parentNode.replaceChild(note, canvas);
+            return note;
+        }
+
+        function updateCleanupTable(cleanups) {
+            const tbody = document.getElementById('cleanupTableBody');
+            if (!cleanups.length) {
+                tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-6 text-center text-sm text-gray-500">No cleanups recorded yet.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = cleanups.map(clean => `
                 <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">${clean.date}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">${clean.type}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${clean.files}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">${clean.freed} MB</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">${escapeHtml(new Date(clean.timestamp).toLocaleString())}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">${escapeHtml(clean.type)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">${escapeHtml(clean.files_deleted)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">${escapeHtml(fmtMb(clean.space_freed_mb))}</td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                            ${clean.status}
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${clean.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                            ${clean.success ? 'completed' : 'partial'}
                         </span>
                     </td>
                 </tr>
             `).join('');
         }
 
-        function generateRecommendations() {
-            const recommendations = [
-                { icon: '📁', text: 'Consider cleaning temp files (estimated 2.3 GB)', priority: 'medium' },
-                { icon: '🔄', text: 'Found 89 duplicate files that can be removed', priority: 'high' },
-                { icon: '💾', text: 'Review large files over 1GB for potential deletion', priority: 'low' },
-                { icon: '☁️', text: 'Sync cloud storage to reduce local duplicates', priority: 'medium' }
-            ];
-            
+        function updatePrediction(prediction) {
+            const card = document.getElementById('predictionCard');
+            if (!prediction.available) {
+                card.innerHTML = `<p class="text-sm text-gray-600 dark:text-gray-400 text-center py-8">${escapeHtml(prediction.message || 'Not enough scan history to project growth.')}</p>`;
+                return;
+            }
+            const date = prediction.predicted_full_date
+                ? `Around ${escapeHtml(prediction.predicted_full_date)}`
+                : `Growth ${Number(prediction.average_daily_growth_mb || 0).toFixed(1)} MB/day; no full-date estimate`;
+            card.innerHTML = `
+                <div class="text-center py-6">
+                    <p class="text-3xl font-bold text-gray-900 dark:text-white">${date}</p>
+                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                        Based on ${escapeHtml(prediction.data_points)} recorded scans · ${escapeHtml(prediction.trend_direction)} trend
+                    </p>
+                </div>`;
+        }
+
+        function updateRecommendations(latest, prediction, trends) {
             const list = document.getElementById('recommendationsList');
-            list.innerHTML = recommendations.map(rec => `
+            const items = [];
+            if (latest && latest.cleanable_gb > 0) {
+                items.push({ text: `${fmtMb(latest.cleanable_gb * 1024)} is marked cleanable from the latest scan.`, priority: 'high' });
+            }
+            if (latest && latest.duplicate_groups > 0) {
+                items.push({ text: `${latest.duplicate_groups} duplicate groups found; review before removing.`, priority: 'medium' });
+            }
+            if (prediction.available && prediction.trend_direction === 'increasing') {
+                items.push({ text: `Storage is growing at ${Number(prediction.average_daily_growth_mb).toFixed(1)} MB/day.`, priority: 'medium' });
+            }
+            if (!items.length) {
+                items.push({ text: hasScan ? 'No cleanup suggestions from the latest scan.' : 'Run a scan to receive suggestions.', priority: 'low' });
+            }
+            list.innerHTML = items.map(item => `
                 <li class="flex items-start space-x-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                    <span class="text-2xl">${rec.icon}</span>
                     <div class="flex-1">
-                        <p class="text-sm text-gray-900 dark:text-white">${rec.text}</p>
-                        <span class="text-xs text-gray-500 dark:text-gray-400 capitalize">${rec.priority} priority</span>
+                        <p class="text-sm text-gray-900 dark:text-white">${escapeHtml(item.text)}</p>
+                        <span class="text-xs text-gray-500 dark:text-gray-400 capitalize">${escapeHtml(item.priority)} priority</span>
                     </div>
                 </li>
             `).join('');
         }
 
-        function refreshData() {
-            fetchData();
-        }
+        function refreshData() { fetchData(); }
 
         // Initialize
         fetchData();
-        
-        // Auto-refresh every 60 seconds
         setInterval(fetchData, 60000);
     </script>
 </body>

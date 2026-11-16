@@ -749,7 +749,8 @@
                 return;
             }
             showSection('cleanup');
-            await performCleanup(type);
+            // The API calls the combined operation 'smart'; the quick action says 'all'.
+            await performCleanup(type === 'all' ? 'smart' : type);
         }
         
         // Cleanup operations

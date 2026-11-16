@@ -120,6 +120,15 @@ def test_ai_prediction_without_scans(client):
     assert body["success_rate"] is None
 
 
+def test_latest_scan_endpoint(client):
+    assert client.get("/api/v1/scan/latest").status_code == 404
+    scan_id = client.post("/api/v1/scan/start", json={"drive": client.scan_root}).get_json()["scan_id"]
+    wait_for_scan(client, scan_id)
+    latest = client.get("/api/v1/scan/latest").get_json()
+    assert latest["files_scanned"] == 1
+    assert latest["categories"]["Documents"] >= 0  # serialised in GB
+
+
 def test_scan_results_without_results(client, monkeypatch):
     monkeypatch.setattr(api_server, "latest_scan_id", "stale-id")
     assert client.get("/api/v1/scan/results/stale-id").status_code == 404

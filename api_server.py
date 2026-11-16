@@ -241,16 +241,10 @@ def scan_status(scan_id):
     })
 
 
-@app.route('/api/v1/scan/results/<scan_id>', methods=['GET'])
-def scan_results(scan_id):
-    """Get scan results"""
-    if scan_id != latest_scan_id:
-        return jsonify({'error': 'Results are only kept for the latest completed scan'}), 404
-    
-    results = get_cleaner().scan_results
-    if results is None:
-        return jsonify({'error': 'No scan results available'}), 404
-    return jsonify({
+def serialize_scan_results(results):
+    """Build the JSON view of a scan; shared by the id and latest endpoints"""
+    cleaner_obj = get_cleaner()
+    return {
         'drive': results.drive,
         'total_used_gb': results.total_used / GB,
         'total_space_gb': results.total_space / GB,
@@ -261,11 +255,32 @@ def scan_results(scan_id):
         'large_files': [{'path': f.path, 'size_gb': f.size / GB, 'age_days': f.age_days}
                         for f in results.large_files[:20]],
         'duplicate_groups': len(results.duplicates),
-        'duplicate_gb': get_cleaner().duplicate_bytes() / GB,
+        'duplicate_gb': cleaner_obj.duplicate_bytes() / GB,
         'temp_files_count': len(results.temp_files),
         'temp_gb': sum(f.size for f in results.temp_files) / GB,
         'cleanable_gb': results.cleanable_size / GB
-    })
+    }
+
+
+@app.route('/api/v1/scan/latest', methods=['GET'])
+def scan_latest():
+    """Get the most recent scan without needing its id (read-only dashboards)"""
+    results = get_cleaner().scan_results
+    if results is None:
+        return jsonify({'error': 'No scan results available'}), 404
+    return jsonify(serialize_scan_results(results))
+
+
+@app.route('/api/v1/scan/results/<scan_id>', methods=['GET'])
+def scan_results(scan_id):
+    """Get scan results"""
+    if scan_id != latest_scan_id:
+        return jsonify({'error': 'Results are only kept for the latest completed scan'}), 404
+
+    results = get_cleaner().scan_results
+    if results is None:
+        return jsonify({'error': 'No scan results available'}), 404
+    return jsonify(serialize_scan_results(results))
 
 
 @app.route('/api/v1/cleanup/run', methods=['POST'])
