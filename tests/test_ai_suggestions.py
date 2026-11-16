@@ -56,6 +56,26 @@ def test_feedback_threshold_is_used():
     assert rec.action == 'review'
 
 
+def test_prediction_without_history_says_unavailable():
+    engine = AISuggestionEngine()
+    summary = engine.get_prediction_summary({'data_points': 1})
+    assert summary['available'] is False
+    assert summary['success_rate'] is None
+    assert 'average_daily_growth_mb' not in summary  # no invented growth figure
+
+
+def test_prediction_uses_supplied_trends():
+    engine = AISuggestionEngine()
+    summary = engine.get_prediction_summary(
+        {'data_points': 5, 'daily_growth_mb': 100, 'trend_direction': 'increasing'},
+        available_bytes=10 * 1024 ** 3,
+    )
+    assert summary['available'] is True
+    assert summary['average_daily_growth_mb'] == 100
+    assert summary['risk_assessment'] == 'moderate'
+    assert 'predicted_full_date' in summary
+
+
 def test_analyze_file_for_safety_uses_real_stats(tmp_path):
     path = tmp_path / 'old.tmp'
     path.write_bytes(b'x' * 1024)

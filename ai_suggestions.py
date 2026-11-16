@@ -9,7 +9,7 @@ import json
 import hashlib
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 from dataclasses import dataclass
 
 
@@ -358,19 +358,42 @@ class AISuggestionEngine:
             elif success_rate < 0.5:
                 self.model_weights['review_threshold'] = 0.6
     
-    def get_prediction_summary(self) -> Dict[str, Any]:
-        """Get summary predictions about storage"""
-        now = datetime.now()
-        thirty_days_ago = now - timedelta(days=30)
-        
-        return {
-            'last_scan': now.isoformat(),
-            'average_daily_growth_mb': 10.5,
-            'predicted_full_date': (now + timedelta(days=90)).strftime('%Y-%m-%d'),
-            'recommendation_count': len(self.deletion_history),
-            'success_rate': 0.85,
-            'risk_assessment': 'low'
+    def get_prediction_summary(self, trends: Optional[Dict[str, Any]] = None,
+                               available_bytes: Optional[int] = None) -> Dict[str, Any]:
+        """Summarise storage predictions from real trend data.
+
+        With fewer than two scans there is no growth rate to project, so say so
+        instead of returning invented numbers.
+        """
+        history = self.deletion_history
+        success_rate = (
+            round(sum(1 for h in history if h['was_safe']) / len(history), 3)
+            if history else None
+        )
+        summary = {
+            'recommendation_count': len(history),
+            'success_rate': success_rate,
+            'data_points': (trends or {}).get('data_points', 0),
         }
+        if not trends or trends.get('data_points', 0) < 2:
+            summary['available'] = False
+            summary['message'] = 'At least two scans are needed for a storage projection'
+            return summary
+
+        daily = float(trends.get('daily_growth_mb', 0))
+        direction = trends.get('trend_direction', 'stable')
+        summary.update({
+            'available': True,
+            'average_daily_growth_mb': round(daily, 2),
+            'trend_direction': direction,
+            'risk_assessment': 'moderate' if direction == 'increasing' else 'low',
+        })
+        if daily > 0 and available_bytes:
+            days_to_full = available_bytes / (daily * 1024 ** 2)
+            summary['predicted_full_date'] = (
+                datetime.now() + timedelta(days=days_to_full)
+            ).strftime('%Y-%m-%d')
+        return summary
 
 
 def main():

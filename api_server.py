@@ -248,6 +248,8 @@ def scan_results(scan_id):
         return jsonify({'error': 'Results are only kept for the latest completed scan'}), 404
     
     results = get_cleaner().scan_results
+    if results is None:
+        return jsonify({'error': 'No scan results available'}), 404
     return jsonify({
         'drive': results.drive,
         'total_used_gb': results.total_used / GB,
@@ -448,7 +450,9 @@ def cloud_get_files():
     """Get files from all connected cloud services"""
     try:
         cloud_manager = get_cloud_manager()
-        
+        if not cloud_manager.connected_services:
+            return jsonify(CLOUD_UNAVAILABLE), 501
+
         limit = request.args.get('limit', 100, type=int)
         files = cloud_manager.get_all_files(limit=limit)
         
@@ -474,7 +478,9 @@ def cloud_stats():
     """Get cloud storage statistics"""
     try:
         cloud_manager = get_cloud_manager()
-        
+        if not cloud_manager.connected_services:
+            return jsonify(CLOUD_UNAVAILABLE), 501
+
         stats = cloud_manager.calculate_cloud_stats()
         
         return jsonify({
@@ -639,6 +645,20 @@ def ai_analyze():
             'recommendations': [asdict(r) for r in recommendations]
         })
 
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/v1/ai/prediction', methods=['GET'])
+def ai_prediction():
+    """Storage projection built from recorded scan history"""
+    try:
+        trends = get_db().calculate_trends(days=90)
+        results = get_cleaner().scan_results
+        available = None
+        if results is not None:
+            available = max(0, results.total_space - results.total_used)
+        return jsonify(get_ai_engine().get_prediction_summary(trends, available))
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

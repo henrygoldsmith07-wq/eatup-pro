@@ -109,6 +109,22 @@ def test_cloud_connect_is_not_implemented(client):
         assert response.get_json()["error"] == "Not implemented"
 
 
+def test_cloud_files_and_stats_are_not_implemented(client):
+    assert client.get("/api/v1/cloud/files").status_code == 501
+    assert client.get("/api/v1/cloud/stats").status_code == 501
+
+
+def test_ai_prediction_without_scans(client):
+    body = client.get("/api/v1/ai/prediction").get_json()
+    assert body["available"] is False
+    assert body["success_rate"] is None
+
+
+def test_scan_results_without_results(client, monkeypatch):
+    monkeypatch.setattr(api_server, "latest_scan_id", "stale-id")
+    assert client.get("/api/v1/scan/results/stale-id").status_code == 404
+
+
 def test_nonlocal_writes_require_api_key(client, monkeypatch):
     remote = {"REMOTE_ADDR": "8.8.8.8"}
     assert client.post("/api/v1/cleanup/run", json={"type": "temp"},

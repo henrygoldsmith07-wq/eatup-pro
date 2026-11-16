@@ -42,12 +42,13 @@ Phase 3: Advanced Platform        → Cloud, AI, API, scheduling ✨
 
 | Feature | Status | Services Supported | File |
 |---------|--------|-------------------|------|
-| Google Drive Sync | ✅ | Full read access | `cloud_storage.py` |
-| Dropbox Integration | ✅ | OAuth authentication | `cloud_storage.py` |
-| Cross-Cloud Scan | ✅ | Unified file listing | `cloud_storage.py` |
-| Download Files | ✅ | Stream from cloud | `cloud_storage.py` |
-| Upload Support | ⏳ Ready for implementation | `cloud_storage.py` |
-| Usage Stats | ✅ | Combined calculation | `cloud_storage.py` |
+| Google Drive Sync | ⚠️ Demo only | Placeholder client ID; no OAuth flow | `cloud_storage.py` |
+| Dropbox Integration | ⚠️ Demo only | Auth helper reads codes from stdin, not from the API | `cloud_storage.py` |
+| Cross-Cloud Scan | ⚠️ Demo only | Works only after manual in-process auth | `cloud_storage.py` |
+| Download Files | ⚠️ Demo only | Dropbox path implemented; Google Drive is a stub | `cloud_storage.py` |
+| Upload Support | ⏳ Not implemented | — | `cloud_storage.py` |
+| REST Connect Endpoints | ❌ Unavailable | Return HTTP 501 | `api_server.py` |
+| Usage Stats | ✅ | Zeroed when no service is connected | `cloud_storage.py` |
 
 ### Scheduled Automation
 
@@ -70,9 +71,10 @@ Phase 3: Advanced Platform        → Cloud, AI, API, scheduling ✨
 | Cleanup | ✅ | POST | `/api/v1/cleanup/run` |
 | Usage Stats | ✅ | GET | `/api/v1/usage/stats` |
 | Scheduling | ✅ | CRUD operations | `/api/v1/schedule/list` |
-| Cloud Connect | ✅ | POST | `/api/v1/cloud/connect/google-drive` |
-| Analytics | ⏳ GET | `/api/v1/analytics/trends` |
-| AI Analysis | ⏳ POST | `/api/v1/ai/analyze` |
+| Cloud Connect | ❌ 501 | Not implemented | `/api/v1/cloud/connect/google-drive` |
+| Analytics | ✅ | GET | `/api/v1/analytics/trends` |
+| AI Analysis | ✅ | POST | `/api/v1/ai/analyze` |
+| AI Prediction | ✅ | GET | `/api/v1/ai/prediction` |
 | Export | ✅ | GET | `/api/v1/export/report` |
 
 ### Documentation & Support
