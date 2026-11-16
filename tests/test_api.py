@@ -36,6 +36,7 @@ def wait_for_scan(client, scan_id):
 def test_health_and_ui(client):
     assert client.get("/api/v1/health").get_json()["status"] == "healthy"
     assert client.get("/app.html").status_code == 200
+    assert client.get("/favicon.ico").status_code == 200
     assert client.get("/api_server.py").status_code == 404
 
 

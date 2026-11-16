@@ -135,6 +135,11 @@ def is_scan_running():
 
 # ==================== WEB UI ====================
 
+@app.route('/favicon.ico')
+def ui_favicon():
+    return send_from_directory(BASE_DIR, 'favicon.ico')
+
+
 @app.route('/')
 def ui_index():
     return send_from_directory(BASE_DIR, 'index.html')
