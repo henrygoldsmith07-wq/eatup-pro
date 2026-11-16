@@ -85,6 +85,11 @@
             opacity: 1;
             transform: translateY(0);
         }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+            .reveal { opacity: 1; transform: none; }
+        }
         
         .accordion-content {
             max-height: 0;
@@ -198,19 +203,6 @@
                         <a href="#download" class="border-2 border-neutral-300 dark:border-neutral-600 hover:border-brand-600 dark:hover:border-brand-400 text-neutral-700 dark:text-neutral-300 px-8 py-4 rounded-full font-semibold text-lg transition-all hover:bg-brand-50 dark:hover:bg-brand-900/20 inline-flex items-center justify-center">
                             View Features
                         </a>
-                    </div>
-
-                    <!-- Rating Badge -->
-                    <div class="inline-flex items-center space-x-3 bg-white dark:bg-neutral-800 px-4 py-2 rounded-full shadow-lg">
-                        <div class="flex items-center">
-                            <svg class="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                            <svg class="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                            <svg class="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                            <svg class="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                            <svg class="w-5 h-5 text-gray-300" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                        </div>
-                        <span class="font-semibold">4.9/5</span>
-                        <span class="text-neutral-500 dark:text-neutral-400">from 142 reviews</span>
                     </div>
                 </div>
 
@@ -356,7 +348,7 @@
                                 <svg class="w-6 h-6 text-green-500 mr-3 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                                 </svg>
-                                <span class="text-neutral-700 dark:text-neutral-300">Cloud sync for your settings</span>
+                                <span class="text-neutral-700 dark:text-neutral-300">Scheduled local scans</span>
                             </li>
                             <li class="flex items-start">
                                 <svg class="w-6 h-6 text-green-500 mr-3 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -368,7 +360,7 @@
                                 <svg class="w-6 h-6 text-green-500 mr-3 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                                 </svg>
-                                <span class="text-neutral-700 dark:text-neutral-300">Multi-device licensing</span>
+                                <span class="text-neutral-700 dark:text-neutral-300">Local REST API and CLI</span>
                             </li>
                         </ul>
                     </div>
@@ -389,9 +381,9 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-16 reveal">
                 <h2 class="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4">Simple pricing.<br/>No subscription</h2>
-                <p class="text-lg text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto">Pay once, use forever. No monthly fees or hidden charges.</p>
+                <p class="text-lg text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto">Illustrative pricing from the original concept site. This open-source demo takes no payments and has no licence keys or paid tier.</p>
             </div>
-            
+
             <div class="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
                 <!-- Free Tier -->
                 <div class="bg-white dark:bg-neutral-800 rounded-3xl p-8 shadow-lg border-2 border-neutral-200 dark:border-neutral-700 reveal">
@@ -468,7 +460,7 @@
                             <svg class="w-6 h-6 text-white mr-3 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                             </svg>
-                            <span class="text-white">Cloud sync for settings</span>
+                            <span class="text-white">Analytics dashboard (local)</span>
                         </li>
                         <li class="flex items-start">
                             <svg class="w-6 h-6 text-white mr-3 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -480,13 +472,13 @@
                             <svg class="w-6 h-6 text-white mr-3 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                             </svg>
-                            <span class="text-white">Multi-device licensing</span>
+                            <span class="text-white">REST API for local automation</span>
                         </li>
                     </ul>
                     
-                    <a href="#download" class="block w-full bg-white text-brand-600 hover:bg-brand-50 px-6 py-4 rounded-full font-semibold text-center transition-colors">
-                        Get Pro Now
-                    </a>
+                    <p class="block w-full bg-white/20 text-white px-6 py-4 rounded-full font-semibold text-center">
+                        Not available in this demo
+                    </p>
                 </div>
             </div>
         </div>
@@ -571,24 +563,16 @@
                     </button>
                     <div class="accordion-content">
                         <div class="px-6 pb-5 text-neutral-600 dark:text-neutral-400">
-                            Simply download the Pro version from our website and enter your license key. There's no need to uninstall the free version first—they share the same data directory. Upgrading is seamless and preserves all your settings.
+                            There is no paid tier or licence key in this demo. All code in this repository is available to run locally; the pricing cards illustrate the original concept only.
                         </div>
                     </div>
                 </div>
             </div>
             
-            <!-- Order Lookup Form -->
-            <div class="bg-white dark:bg-neutral-800 rounded-3xl p-8 shadow-xl reveal">
-                <h3 class="text-2xl font-bold text-center mb-6">Order Lookup</h3>
-                <form class="space-y-4 max-w-md mx-auto">
-                    <div>
-                        <label class="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">Email Address</label>
-                        <input type="email" placeholder="Enter your email" class="w-full px-4 py-3 border border-neutral-300 dark:border-neutral-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-transparent dark:bg-neutral-700 dark:text-white transition-all"/>
-                    </div>
-                    <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white px-6 py-3 rounded-xl font-semibold transition-all hover:shadow-lg hover:shadow-brand-500/30">
-                        Find My Order
-                    </button>
-                </form>
+            <!-- No order system exists in this open-source demo -->
+            <div class="bg-white dark:bg-neutral-800 rounded-3xl p-8 shadow-xl reveal text-center">
+                <h3 class="text-2xl font-bold mb-3">No orders to look up</h3>
+                <p class="text-neutral-600 dark:text-neutral-400">EatUp Pro is an educational, open-source project. There is no checkout, order history or licence system behind this page.</p>
             </div>
         </div>
     </section>
@@ -602,9 +586,8 @@
                 </div>
                 
                 <div class="flex space-x-6">
-                    <a href="#" class="text-neutral-600 dark:text-neutral-400 hover:text-brand-600 dark:hover:text-brand-400 transition-colors">Privacy Policy</a>
-                    <a href="#" class="text-neutral-600 dark:text-neutral-400 hover:text-brand-600 dark:hover:text-brand-400 transition-colors">Terms of Service</a>
-                    <a href="#" class="text-neutral-600 dark:text-neutral-400 hover:text-brand-600 dark:hover:text-brand-400 transition-colors">Contact Us</a>
+                    <a href="https://github.com/henrygoldsmith07-wq/eatup-pro" class="text-neutral-600 dark:text-neutral-400 hover:text-brand-600 dark:hover:text-brand-400 transition-colors">Source code</a>
+                    <a href="https://github.com/henrygoldsmith07-wq/eatup-pro#readme" class="text-neutral-600 dark:text-neutral-400 hover:text-brand-600 dark:hover:text-brand-400 transition-colors">Documentation</a>
                 </div>
             </div>
         </div>
