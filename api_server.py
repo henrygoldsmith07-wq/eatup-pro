@@ -9,6 +9,7 @@ import sys
 import hmac
 import json
 import math
+import re
 import time
 from dataclasses import asdict
 from datetime import datetime
@@ -181,6 +182,10 @@ def scan_start():
     with_duplicates = data.get('find_duplicates', True)
     if not isinstance(drive, str) or not drive.strip() or len(drive) > 260:
         return jsonify({'error': 'drive must be a non-empty path of at most 260 characters'}), 400
+    # UNC paths make the service account authenticate to a remote SMB host;
+    # traversal segments let a caller escape the intended scan root.
+    if drive.startswith('\\\\') or drive.startswith('//') or re.search(r'(^|[\\/])\.\.([\\/]|$)', drive):
+        return jsonify({'error': 'network paths and traversal segments are not allowed'}), 400
     if not isinstance(with_duplicates, bool):
         return jsonify({'error': 'find_duplicates must be a boolean'}), 400
 
@@ -763,6 +768,12 @@ def internal_error(error):
 
 # ==================== MAIN ENTRY POINT ====================
 
+def validate_debug_host(host, debug):
+    """The Werkzeug console must never be exposed on a network interface"""
+    if debug and host not in LOCAL_HOSTNAMES:
+        raise SystemExit('DEBUG must not be enabled on a network-facing host')
+
+
 def main():
     """Start the API server"""
     # Windows consoles default to cp1252; the engine logs emoji, which would
@@ -773,7 +784,8 @@ def main():
 
     port = int(os.getenv('PORT', 5000))
     debug = os.getenv('DEBUG', 'false').lower() == 'true'
-    
+    validate_debug_host(HOST, debug)
+
     print(f"Starting EatUp Pro API Server on {HOST}:{port}")
     print(f"App: http://localhost:{port}/app.html")
     print(f"Health check: http://localhost:{port}/api/v1/health")

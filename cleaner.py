@@ -250,11 +250,16 @@ class EatUpCleaner:
                     continue
                 if file_stat.st_size < DUPLICATE_MIN_BYTES:
                     continue
+                category = self._classify_file(filepath)
+                # Temporary files are already counted (and cleaned) as temp.
+                # Including them here would double-count the same bytes.
+                if category == 'Temporary':
+                    continue
                 size_groups.setdefault(file_stat.st_size, []).append(FileInfo(
                     path=str(filepath),
                     size=file_stat.st_size,
                     name=filename,
-                    category=self._classify_file(filepath),
+                    category=category,
                     age_days=int((now - file_stat.st_mtime) / 86400),
                     mtime=file_stat.st_mtime
                 ))
@@ -320,16 +325,23 @@ class EatUpCleaner:
         return self.scan_results.temp_files[:limit]
 
     @staticmethod
+    def _still_matches(file_info: FileInfo) -> bool:
+        """Has this file stayed the same since it was scanned?"""
+        try:
+            current = os.stat(file_info.path)
+        except OSError:
+            return False
+        return (current.st_size == file_info.size
+                and (not file_info.mtime or abs(current.st_mtime - file_info.mtime) <= 1))
+
+    @staticmethod
     def _recycle_files(files: List[FileInfo], dry_run: bool) -> CleanupResult:
         """Move files to the Recycle Bin, skipping any that changed since the scan"""
         result = CleanupResult()
         for file_info in files:
             if not dry_run:
                 try:
-                    current = os.stat(file_info.path)
-                    if (current.st_size != file_info.size
-                            or (file_info.mtime
-                                and abs(current.st_mtime - file_info.mtime) > 1)):
+                    if not EatUpCleaner._still_matches(file_info):
                         continue  # Modified since scan: no longer the file we vetted
                     move_to_recycle_bin(file_info.path)
                 except FileNotFoundError:
@@ -373,16 +385,18 @@ class EatUpCleaner:
             print("No duplicates found")
             return result
 
-        for dup_group in self.scan_results.duplicates:
-            keeper = dup_group[0]
-            if not dry_run and not os.path.exists(keeper.path):
-                continue  # Never remove the last surviving copy
+        # A group is only safe to act on if the copy we intend to keep is still
+        # the exact file we scanned. Otherwise drop the group: it can no longer
+        # be cleaned safely and must not keep inflating cleanable_size.
+        valid_groups = [group for group in self.scan_results.duplicates
+                        if self._still_matches(group[0])]
+        for dup_group in valid_groups:
             result.merge(self._recycle_files(dup_group[1:], dry_run))
 
         if not dry_run:
             self.scan_results.duplicates = [
-                group for group in (self._remaining(g) for g in self.scan_results.duplicates)
-                if len(group) > 1
+                group for group in (self._remaining(g) for g in valid_groups)
+                if len(group) > 1 and self._still_matches(group[0])
             ]
             self._refresh_cleanable_size()
 

@@ -153,7 +153,7 @@
         </section>
 
         <!-- Cleanup Section -->
-        <section id="cleanup-section" class="max-w-7xl mx-auto hidden reveal">
+        <section id="cleanup-section" class="max-w-7xl mx-auto hidden reveal active">
             <div class="mb-8">
                 <h1 class="text-3xl md:text-4xl font-bold mb-2">File Cleanup</h1>
                 <p class="text-neutral-600 dark:text-neutral-400">Review and remove unwanted files safely</p>
@@ -200,7 +200,7 @@
         </section>
 
         <!-- Results Section -->
-        <section id="results-section" class="max-w-7xl mx-auto hidden reveal">
+        <section id="results-section" class="max-w-7xl mx-auto hidden reveal active">
             <div class="text-center mb-8">
                 <div class="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
                     <svg class="w-12 h-12 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
@@ -638,7 +638,7 @@
 
         // Update Selection
         function updateSelection() {
-            const selected = [...document.querySelectorAll('#cleanup-categories input:checked')];
+            const selected = [...document.querySelectorAll('#cleanupCategories input:checked')];
             const preview = document.getElementById('cleanupPreview');
             if (selected.length) {
                 preview.classList.remove('hidden');
@@ -672,10 +672,13 @@
                 large.forEach(file => {
                     const item = document.createElement('div');
                     item.className = 'flex justify-between items-center gap-3 p-4 bg-neutral-50 dark:bg-neutral-900 rounded-lg';
+                    // Paths come from the API, so treat them as untrusted text.
+                    const path = escapeHtml(file.path);
+                    const name = escapeHtml(String(file.path).split(/[\\/]/).pop());
                     item.innerHTML = `
                         <div class="min-w-0">
-                            <p class="font-semibold truncate" title="${file.path}">${file.path.split(/[\\/]/).pop()}</p>
-                            <p class="text-sm text-neutral-500 truncate">${file.path}</p>
+                            <p class="font-semibold truncate" title="${path}">${name}</p>
+                            <p class="text-sm text-neutral-500 truncate">${path}</p>
                         </div>
                         <p class="font-bold text-brand-500 whitespace-nowrap">${(file.size_gb || 0).toFixed(2)} GB</p>
                     `;
@@ -693,7 +696,7 @@
         }
 
         // Execute Cleanup via API
-        async function performCleanup(cleanupType = 'smart') {
+        async function performCleanup(cleanupType = 'smart', options = {}) {
             const modal = document.getElementById('scanModal');
             const progressBar = document.getElementById('scanProgress');
             const statusText = document.getElementById('scanStatus');
@@ -722,15 +725,17 @@
                 // Wait a moment then show results
                 await sleep(1500);
                 
-                modal.classList.add('hidden');
-                
-                // Show results
-                displayCleanupResults(data.space_freed_mb || 0, cleanupType);
-                
+                if (!options.deferDisplay) {
+                    modal.classList.add('hidden');
+                    displayCleanupResults(data.space_freed_mb || 0, cleanupType);
+                }
+                return data.space_freed_mb || 0;
+
             } catch (error) {
                 console.error('Cleanup error:', error);
                 modal.classList.add('hidden');
                 showApiError(error.message || 'Cleanup could not be completed. No files were changed.');
+                return 0;
             }
         }
         
@@ -771,17 +776,36 @@
         
         async function executeCleanup() {
             closeDialog();
-            await performCleanup('temp'); // Default to temp file cleanup
+            const selected = [...document.querySelectorAll('#cleanupCategories input:checked')]
+                .map(cb => (cb.closest('[id]')?.id || '').replace('-card', ''))
+                .filter(id => ['temp', 'duplicates', 'large'].includes(id));
+            if (!selected.length) {
+                showApiError('Select at least one cleanup category first. No files were changed.');
+                return;
+            }
+            const types = (selected.includes('temp') && selected.includes('duplicates'))
+                ? ['smart', ...selected.filter(id => id === 'large')]
+                : selected;
+            let freed = 0;
+            for (const type of types) {
+                freed += await performCleanup(type, { deferDisplay: true });
+            }
+            document.getElementById('scanModal').classList.add('hidden');
+            displayCleanupResults(freed, types.join('+'));
         }
 
         // Deselect All
         function deselectAll() {
-            document.querySelectorAll('#cleanup-categories input[type="checkbox"]').forEach(cb => cb.checked = false);
+            document.querySelectorAll('#cleanupCategories input[type="checkbox"]').forEach(cb => cb.checked = false);
             document.getElementById('cleanupPreview').classList.add('hidden');
         }
 
         // Initialize
         window.addEventListener('load', () => {
+            if (!lastScanResults) {
+                document.getElementById('cleanupCategories').innerHTML =
+                    '<p class="text-sm text-neutral-500 rounded-xl border border-dashed border-neutral-300 dark:border-neutral-700 p-8 text-center">Run a scan from Storage Overview to review cleanup candidates.</p>';
+            }
             if (localStorage.getItem('theme') === 'dark') {
                 document.documentElement.classList.add('dark');
             }

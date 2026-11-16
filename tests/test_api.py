@@ -67,9 +67,18 @@ def test_cleanup_requires_scan_and_json(client):
                        content_type="text/plain").status_code == 415
 
 
+def test_debug_is_refused_on_network_hosts():
+    api_server.validate_debug_host("127.0.0.1", True)
+    api_server.validate_debug_host("0.0.0.0", False)
+    with pytest.raises(SystemExit):
+        api_server.validate_debug_host("0.0.0.0", True)
+
+
 def test_write_inputs_are_validated(client):
     assert client.post("/api/v1/scan/start", json={"drive": ""}).status_code == 400
     assert client.post("/api/v1/scan/start", json={"find_duplicates": "yes"}).status_code == 400
+    assert client.post("/api/v1/scan/start", json={"drive": "\\\\evil\\share"}).status_code == 400
+    assert client.post("/api/v1/scan/start", json={"drive": "..\\..\\"}).status_code == 400
 
     scan_id = client.post("/api/v1/scan/start", json={"drive": client.scan_root}).get_json()["scan_id"]
     wait_for_scan(client, scan_id)

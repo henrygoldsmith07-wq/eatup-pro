@@ -119,6 +119,51 @@ def test_cleanup_skips_files_modified_since_scan(tree, monkeypatch):
     assert c.cleanup_temp_files().files_deleted == 0
 
 
+def test_temp_duplicate_is_not_double_counted(tree):
+    # Give the aged temp file the same content/size as a normal document.
+    temp_copy = tree / "work" / "old.tmp"
+    temp_copy.write_bytes(b"diff content")
+    old = time.time() - 3 * 86400
+    os.utime(temp_copy, (old, old))
+
+    c = EatUpCleaner()
+    c.scan_drive(str(tree))
+    c.find_duplicates()
+    assert len(c.scan_results.duplicates) == 1  # only docs/a.txt pair
+    assert c.duplicate_bytes() == 12
+    assert c.scan_results.cleanable_size == 24  # 12 temp + 12 duplicate, not 36
+
+
+def test_duplicate_cleanup_skips_group_when_keeper_changed(tree, monkeypatch):
+    def fake_recycle(path):
+        os.remove(path)
+
+    monkeypatch.setattr(cleaner, "move_to_recycle_bin", fake_recycle)
+    c = EatUpCleaner()
+    c.scan_drive(str(tree))
+    group = c.find_duplicates()[0]
+    keeper = Path(group[0].path)
+    keeper.write_bytes(b"changed!")  # same length, fresh mtime
+    other = Path(group[1].path)
+
+    result = c.cleanup_duplicates()
+    assert result.files_deleted == 0
+    assert other.exists()
+
+
+def test_duplicate_cleanup_drops_group_when_keeper_disappears(tree, monkeypatch):
+    monkeypatch.setattr(cleaner, "move_to_recycle_bin", lambda p: os.remove(p))
+    c = EatUpCleaner()
+    c.scan_drive(str(tree))
+    group = c.find_duplicates()[0]
+    os.remove(group[0].path)
+    other = Path(group[1].path)
+
+    c.cleanup_duplicates()
+    assert c.duplicate_bytes() == 0
+    assert other.exists()
+
+
 def test_report_does_not_block_on_cpu_sampling(tree, monkeypatch):
     intervals = []
     real_cpu_percent = cleaner.psutil.cpu_percent
