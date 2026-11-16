@@ -134,6 +134,16 @@ def test_scan_results_without_results(client, monkeypatch):
     assert client.get("/api/v1/scan/results/stale-id").status_code == 404
 
 
+def test_nonlocal_reads_require_api_key(client, monkeypatch):
+    remote = {"REMOTE_ADDR": "8.8.8.8"}
+    for path in ("/api/v1/scan/latest", "/api/v1/analytics/statistics",
+                 "/api/v1/schedule/list"):
+        assert client.get(path, environ_base=remote).status_code == 403
+    monkeypatch.setenv("API_KEY", "secret")
+    assert client.get("/api/v1/analytics/statistics", environ_base=remote,
+                      headers={"X-API-Key": "secret"}).status_code == 200
+
+
 def test_nonlocal_writes_require_api_key(client, monkeypatch):
     remote = {"REMOTE_ADDR": "8.8.8.8"}
     assert client.post("/api/v1/cleanup/run", json={"type": "temp"},

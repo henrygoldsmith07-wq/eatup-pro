@@ -221,6 +221,7 @@ def run_scan(scan_id, drive, with_duplicates):
 
 
 @app.route('/api/v1/scan/status/<scan_id>', methods=['GET'])
+@require_auth
 def scan_status(scan_id):
     """Get scan status"""
     job = scan_jobs.get(scan_id)
@@ -263,6 +264,7 @@ def serialize_scan_results(results):
 
 
 @app.route('/api/v1/scan/latest', methods=['GET'])
+@require_auth
 def scan_latest():
     """Get the most recent scan without needing its id (read-only dashboards)"""
     results = get_cleaner().scan_results
@@ -272,6 +274,7 @@ def scan_latest():
 
 
 @app.route('/api/v1/scan/results/<scan_id>', methods=['GET'])
+@require_auth
 def scan_results(scan_id):
     """Get scan results"""
     if scan_id != latest_scan_id:
@@ -342,6 +345,7 @@ def cleanup_run():
 # ==================== USAGE STATISTICS ====================
 
 @app.route('/api/v1/usage/stats', methods=['GET'])
+@require_auth
 def usage_stats():
     """Get current disk usage statistics"""
     try:
@@ -394,6 +398,7 @@ def schedule_create():
 
 
 @app.route('/api/v1/schedule/list', methods=['GET'])
+@require_auth
 def schedule_list():
     """List all scheduled tasks"""
     try:
@@ -514,6 +519,7 @@ def cloud_stats():
 # ==================== ANALYTICS ====================
 
 @app.route('/api/v1/analytics/trends', methods=['GET'])
+@require_auth
 def analytics_trends():
     """Get historical usage trends"""
     try:
@@ -530,6 +536,7 @@ def analytics_trends():
 
 
 @app.route('/api/v1/analytics/scans', methods=['GET'])
+@require_auth
 def analytics_scans():
     """Get list of recent scans"""
     try:
@@ -555,6 +562,7 @@ def analytics_scans():
 
 
 @app.route('/api/v1/analytics/cleanup-history', methods=['GET'])
+@require_auth
 def analytics_cleanup_history():
     """Get history of cleanup operations"""
     try:
@@ -580,6 +588,7 @@ def analytics_cleanup_history():
 
 
 @app.route('/api/v1/analytics/statistics', methods=['GET'])
+@require_auth
 def analytics_statistics():
     """Get overall app statistics"""
     try:
@@ -665,6 +674,7 @@ def ai_analyze():
 
 
 @app.route('/api/v1/ai/prediction', methods=['GET'])
+@require_auth
 def ai_prediction():
     """Storage projection built from recorded scan history"""
     try:

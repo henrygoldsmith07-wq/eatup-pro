@@ -119,6 +119,15 @@ def test_cleanup_skips_files_modified_since_scan(tree, monkeypatch):
     assert c.cleanup_temp_files().files_deleted == 0
 
 
+def test_report_does_not_block_on_cpu_sampling(tree):
+    c = EatUpCleaner()
+    c.scan_drive(str(tree))
+    started = time.monotonic()
+    report = c.build_report()
+    assert report is not None
+    assert time.monotonic() - started < 0.5  # old interval=1 made this take ~1s
+
+
 def test_cleanable_size_tracks_completed_cleanup(tree, monkeypatch):
     def fake_recycle(path):
         os.remove(path)
@@ -135,6 +144,15 @@ def test_cleanable_size_tracks_completed_cleanup(tree, monkeypatch):
     assert c.scan_results.cleanable_size == 0
     assert c.cleanup_temp_files().files_deleted == 0
     assert c.scan_results.cleanable_size == 0
+
+
+def test_cleanup_skips_same_size_replacement(tree, monkeypatch):
+    monkeypatch.setattr(cleaner, "move_to_recycle_bin", lambda p: pytest.fail("should not delete"))
+    c = EatUpCleaner()
+    c.scan_drive(str(tree))
+    target = tree / "work" / "old.tmp"
+    target.write_bytes(b"y" * 10)  # same size, fresher mtime
+    assert c.cleanup_temp_files().files_deleted == 0
 
 
 def test_delete_errors_are_reported(tree, monkeypatch):

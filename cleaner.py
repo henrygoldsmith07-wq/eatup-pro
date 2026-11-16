@@ -21,6 +21,10 @@ except ImportError:  # Non-Windows: scanning works, deletion is unavailable
     winshell = None
 
 
+# Prime the non-blocking CPU sampler; the first read otherwise returns a
+# meaningless 0 and reporting previously blocked for a full second.
+psutil.cpu_percent(interval=None)
+
 GB = 1024 ** 3
 LARGE_FILE_BYTES = GB
 DUPLICATE_MIN_BYTES = 1024 ** 2
@@ -58,6 +62,7 @@ class FileInfo:
     category: str
     age_days: int = 0
     is_duplicate: bool = False
+    mtime: float = 0.0  # guards against a same-size replacement after the scan
 
 
 @dataclass
@@ -138,10 +143,12 @@ class EatUpCleaner:
                 categories[category] += file_size
 
                 if file_size >= LARGE_FILE_BYTES:
-                    large_files.append(FileInfo(str(filepath), file_size, filename, category, age_days))
+                    large_files.append(FileInfo(str(filepath), file_size, filename, category,
+                                                age_days, mtime=file_stat.st_mtime))
 
                 if category == 'Temporary' and age_days >= TEMP_MIN_AGE_DAYS:
-                    temp_files.append(FileInfo(str(filepath), file_size, filename, 'Temporary', age_days))
+                    temp_files.append(FileInfo(str(filepath), file_size, filename, 'Temporary',
+                                               age_days, mtime=file_stat.st_mtime))
 
                 self.files_scanned += 1
                 if self.files_scanned % 1000 == 0:
@@ -248,7 +255,8 @@ class EatUpCleaner:
                     size=file_stat.st_size,
                     name=filename,
                     category=self._classify_file(filepath),
-                    age_days=int((now - file_stat.st_mtime) / 86400)
+                    age_days=int((now - file_stat.st_mtime) / 86400),
+                    mtime=file_stat.st_mtime
                 ))
 
         duplicates = []
@@ -318,7 +326,10 @@ class EatUpCleaner:
         for file_info in files:
             if not dry_run:
                 try:
-                    if os.path.getsize(file_info.path) != file_info.size:
+                    current = os.stat(file_info.path)
+                    if (current.st_size != file_info.size
+                            or (file_info.mtime
+                                and abs(current.st_mtime - file_info.mtime) > 1)):
                         continue  # Modified since scan: no longer the file we vetted
                     move_to_recycle_bin(file_info.path)
                 except FileNotFoundError:
@@ -406,7 +417,7 @@ class EatUpCleaner:
     def get_system_stats(self) -> Dict[str, Any]:
         """Get current system statistics"""
         return {
-            'cpu_percent': psutil.cpu_percent(interval=1),
+            'cpu_percent': psutil.cpu_percent(interval=None),
             'memory_percent': psutil.virtual_memory().percent,
             'disk_percent': psutil.disk_usage(os.path.abspath(os.sep)).percent,
             'uptime': psutil.boot_time(),
