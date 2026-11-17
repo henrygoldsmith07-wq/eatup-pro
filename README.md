@@ -246,6 +246,12 @@ The site uses a precompiled `static/tailwind.css` (no runtime CDN script), which
 npx tailwindcss@3.4.17 -c tailwind.config.js -i tailwind.input.css -o static/tailwind.css --minify
 ```
 
+## 🔒 Reproducible installs
+
+Python dependencies are pinned in `requirements.txt` with a resolved `requirements.lock.txt`
+(`uv pip compile requirements.txt -o requirements.lock.txt`). Node build tooling is pinned in
+`package.json` and `package-lock.json`.
+
 ## 🧪 Testing
 
 ```bash
