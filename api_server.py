@@ -144,7 +144,7 @@ def is_scan_running():
 SECURITY_HEADERS = {
     'Content-Security-Policy': (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdn.jsdelivr.net; "
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
         "font-src 'self' https://fonts.gstatic.com data:; "
         "img-src 'self' data:; connect-src 'self'; "
@@ -166,6 +166,11 @@ def apply_security_headers(response):
 @app.route('/favicon.ico')
 def ui_favicon():
     return send_from_directory(BASE_DIR, 'favicon.ico')
+
+
+@app.route('/vendor/<path:filename>')
+def ui_vendor(filename):
+    return send_from_directory(os.path.join(BASE_DIR, 'vendor'), filename)
 
 
 @app.route('/')
