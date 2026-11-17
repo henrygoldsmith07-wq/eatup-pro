@@ -2,7 +2,7 @@
 
 A modern, powerful disk space analyzer and cleanup tool for Windows. Analyze your storage, find duplicates, remove temporary files, and reclaim valuable space safely.
 
-**Latest Version**: v1.2.0 with **real duplicate detection**, **suggestion engine wired into the API**, and **production-ready deployment configuration**
+**Current API version**: 1.2.0 (reported by `/api/v1/health`), with **real duplicate detection** and a **suggestion engine wired into the API**. The repository also contains experimental `v8.x` research modules; they are not connected to the web UI or the documented REST API.
 
 ## 🌟 Features
 
