@@ -4,7 +4,8 @@
   "description": "Enterprise disk cleanup and storage management platform with AI-powered recommendations",
   "main": "index.html",
   "scripts": {
-    "build": "echo 'No build step required for static files'",
+    "build": "echo 'Static files are prebuilt; run npm run css after changing classes'",
+    "css": "tailwindcss -c tailwind.config.js -i tailwind.input.css -o static/tailwind.css --minify",
     "dev": "python api_server.py --port 8080",
     "start": "python api_server.py",
     "vercel-build": "echo 'Vercel build complete'"
@@ -19,7 +20,9 @@
   "author": "EatUp Team",
   "license": "MIT",
   "dependencies": {},
-  "devDependencies": {},
+  "devDependencies": {
+    "tailwindcss": "3.4.17"
+  },
   "engines": {
     "node": ">=14.0.0",
     "python": ">=3.8.0"
