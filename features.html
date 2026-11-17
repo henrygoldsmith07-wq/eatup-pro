@@ -6,35 +6,9 @@
     <title>EatUp Features - Full Showcase</title>
     <meta name="description" content="Explore EatUp Pro's storage map, duplicate detection and Recycle Bin-safe cleanup features.">
     <link rel="icon" href="/favicon.ico" sizes="any">
-    <script src="/vendor/tailwind-3.4.17.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>
-        .reveal { opacity: 0; transform: translateY(30px); transition: all 0.8s ease; }
-        .reveal.active { opacity: 1; transform: translateY(0); }
-        .dark body { color: #f5f5f5; }
-        .dark .text-neutral-500, .dark .text-neutral-600 { color: #d4d4d8; }
-        @media (prefers-reduced-motion: reduce) {
-            *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
-            .reveal { opacity: 1; transform: none; }
-        }
-        .glass-nav { background-color: rgba(255,255,255,0.9); backdrop-filter: blur(24px); }
-        .dark .glass-nav { background-color: rgba(7,9,14,0.9); }
-        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
-        .animate-float { animation: float 6s ease-in-out infinite; }
-        .treemap-item { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-        .treemap-item:hover { transform: scale(1.05); z-index: 10; box-shadow: 0 10px 40px rgba(0,0,0,0.3); }
-    </style>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    fontFamily: { sans: ['Plus Jakarta Sans', 'sans-serif'] },
-                    colors: { brand: { 500: '#0071e3', 600: '#0077ed', 700: '#005bb5' } }
-                }
-            }
-        }
-    </script>
+    <link rel="stylesheet" href="/static/tailwind.css">
+    <link rel="stylesheet" href="/static/features.css">
 </head>
 <body class="bg-[#fbfbfd] dark:bg-[#07090e] transition-colors duration-300">
 
@@ -75,10 +49,10 @@
                     </div>
                     
                     <div class="grid grid-cols-6 gap-2 h-64">
-                        <div class="treemap-item bg-blue-500 rounded-lg relative group" style="grid-row: span 3; grid-column: span 2;" tabindex="0" role="img" aria-label="Applications - 89 GB" title="Applications - 89 GB">
+                        <div class="[grid-row:span_3] [grid-column:span_2] treemap-item bg-blue-500 rounded-lg relative group" tabindex="0" role="img" aria-label="Applications - 89 GB" title="Applications - 89 GB">
                             <div class="absolute inset-0 flex items-center justify-center text-white font-bold text-sm opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity">Apps (89GB)</div>
                         </div>
-                        <div class="treemap-item bg-green-500 rounded-lg" style="grid-row: span 2;" tabindex="0" role="img" aria-label="Videos - 47 GB" title="Videos - 47 GB">
+                        <div class="[grid-row:span_2] treemap-item bg-green-500 rounded-lg" tabindex="0" role="img" aria-label="Videos - 47 GB" title="Videos - 47 GB">
                             <div class="absolute inset-0 flex items-center justify-center text-white font-bold text-xs opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity">Videos (47GB)</div>
                         </div>
                         <div class="treemap-item bg-purple-500 rounded-lg" tabindex="0" role="img" aria-label="Documents - 31 GB" title="Documents - 31 GB"></div>
@@ -190,34 +164,6 @@
         </div>
     </footer>
 
-    <script>
-        // Theme Toggle
-        function toggleTheme() {
-            const html = document.documentElement;
-            const isDark = html.classList.toggle('dark');
-            localStorage.setItem('theme', isDark ? 'dark' : 'light');
-        }
-        
-        // Scroll Animations
-        function checkReveal() {
-            document.querySelectorAll('.reveal').forEach(el => {
-                if (el.getBoundingClientRect().top < window.innerHeight - 100) {
-                    el.classList.add('active');
-                }
-            });
-        }
-        
-        window.addEventListener('load', () => {
-            const storedTheme = localStorage.getItem('theme');
-            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-            if (storedTheme === 'dark' || (!storedTheme && prefersDark)) {
-                document.documentElement.classList.add('dark');
-            }
-            checkReveal();
-        });
-        
-        window.addEventListener('scroll', checkReveal);
-        document.getElementById('themeToggle').addEventListener('click', toggleTheme);
-    </script>
+    <script src="/static/features.js"></script>
 </body>
 </html>

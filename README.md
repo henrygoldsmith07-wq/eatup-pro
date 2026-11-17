@@ -238,6 +238,14 @@ def _classify_file(filepath: Path) -> str:
     # ... existing code
 ```
 
+## 🎨 Rebuilding the stylesheet
+
+The site uses a precompiled `static/tailwind.css` (no runtime CDN script), which keeps the strict Content-Security-Policy intact. After changing HTML classes, rebuild it with:
+
+```bash
+npx tailwindcss@3.4.17 -c tailwind.config.js -i tailwind.input.css -o static/tailwind.css --minify
+```
+
 ## 🧪 Testing
 
 ```bash

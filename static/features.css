@@ -1,0 +1,14 @@
+.reveal { opacity: 0; transform: translateY(30px); transition: all 0.8s ease; }
+        .reveal.active { opacity: 1; transform: translateY(0); }
+        .dark body { color: #f5f5f5; }
+        .dark .text-neutral-500, .dark .text-neutral-600 { color: #d4d4d8; }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+            .reveal { opacity: 1; transform: none; }
+        }
+        .glass-nav { background-color: rgba(255,255,255,0.9); backdrop-filter: blur(24px); }
+        .dark .glass-nav { background-color: rgba(7,9,14,0.9); }
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+        .animate-float { animation: float 6s ease-in-out infinite; }
+        .treemap-item { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .treemap-item:hover { transform: scale(1.05); z-index: 10; box-shadow: 0 10px 40px rgba(0,0,0,0.3); }

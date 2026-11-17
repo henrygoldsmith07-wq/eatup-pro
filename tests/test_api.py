@@ -41,14 +41,17 @@ def test_security_headers_are_present(client):
     assert response.headers["X-Content-Type-Options"] == "nosniff"
     assert response.headers["X-Frame-Options"] == "DENY"
     assert response.headers["Referrer-Policy"] == "no-referrer"
-    assert "default-src 'self'" in response.headers["Content-Security-Policy"]
+    csp = response.headers["Content-Security-Policy"]
+    assert "default-src 'self'" in csp
+    assert "unsafe-inline" not in csp
+    assert client.get("/static/tailwind.css").status_code == 200
 
 
 def test_health_and_ui(client):
     assert client.get("/api/v1/health").get_json()["status"] == "healthy"
     assert client.get("/app.html").status_code == 200
     assert client.get("/favicon.ico").status_code == 200
-    assert client.get("/vendor/tailwind-3.4.17.js").status_code == 200
+    assert client.get("/static/tailwind.css").status_code == 200
     assert client.get("/api_server.py").status_code == 404
 
 
